@@ -1,0 +1,1 @@
+export const WEB_URL = "https://warperia.com/";

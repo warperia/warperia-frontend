@@ -1,0 +1,126 @@
+{
+  "name": "warperia",
+  "version": "1.0.2",
+  "description": "World of Warcraft Private Servers Addon Manager application",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "webpack serve --mode development",
+    "build": "webpack --mode production",
+    "electron": "electron .",
+    "dev": "concurrently \"npm run start\" \"npm run electron-dev\"",
+    "electron-dev": "wait-on http://localhost:9000 && electron .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux"
+  },
+  "keywords": [],
+  "author": "The Warperia Team",
+  "license": "ISC",
+  "build": {
+    "appId": "com.example.warperia",
+    "productName": "Warperia",
+    "copyright": "Copyright © 2024 Warperia",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist/**/*",
+      "src/main.cjs",
+      "src/preload.cjs",
+      "assets/**/*"
+    ],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://warperia.com/wp-content/themes/warperia-com/updates"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "runAfterFinish": true
+    }
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/preset-react": "^7.24.7",
+    "@electron-forge/cli": "^7.5.0",
+    "@electron-forge/maker-deb": "^7.5.0",
+    "@electron-forge/maker-rpm": "^7.5.0",
+    "@electron-forge/maker-squirrel": "^7.5.0",
+    "@electron-forge/maker-zip": "^7.5.0",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.5.0",
+    "@electron-forge/plugin-fuses": "^7.5.0",
+    "@electron-forge/plugin-webpack": "^7.5.0",
+    "@electron/fuses": "^1.8.0",
+    "babel-loader": "^9.1.3",
+    "concurrently": "^8.2.2",
+    "copy-webpack-plugin": "^12.0.2",
+    "css-loader": "^7.1.2",
+    "electron": "^31.3.1",
+    "electron-builder": "^25.1.8",
+    "electron-is-dev": "^3.0.1",
+    "electron-reload": "^2.0.0-alpha.1",
+    "html-webpack-plugin": "^5.6.0",
+    "style-loader": "^4.0.0",
+    "wait-on": "^7.2.0",
+    "webpack": "^5.96.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.0.4"
+  },
+  "dependencies": {
+    "@tippyjs/react": "^4.2.6",
+    "assert": "^2.1.0",
+    "axios": "^1.7.7",
+    "bootstrap": "^5.3.3",
+    "bootstrap-icons": "^1.11.3",
+    "browserify-zlib": "^0.2.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.0",
+    "electron-dl": "^4.0.0",
+    "electron-is-dev": "^3.0.1",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-store": "^10.0.0",
+    "electron-updater": "^6.3.9",
+    "extract-zip": "^2.0.1",
+    "file-saver": "^2.0.5",
+    "fuse.js": "^7.0.0",
+    "https": "^1.0.0",
+    "jszip": "^3.10.1",
+    "lodash": "^4.17.21",
+    "os-browserify": "^0.3.0",
+    "path-browserify": "^1.0.1",
+    "php-unserialize": "^0.0.1",
+    "process": "^0.11.10",
+    "ps-list": "^8.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0",
+    "react-select": "^5.8.0",
+    "react-svg": "^16.1.34",
+    "stream-browserify": "^3.0.0",
+    "swiper": "^11.1.9",
+    "unzipper": "^0.12.3",
+    "util": "^0.12.5",
+    "uuid": "^11.0.3",
+    "win-version-info": "^6.0.1",
+    "yaml": "^2.6.0"
+  },
+  "type": "module"
+}
