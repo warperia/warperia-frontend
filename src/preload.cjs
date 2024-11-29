@@ -93,11 +93,27 @@ try {
 
       const processInstance = spawn(exePath, [], {
         detached: true,
-        stdio: 'ignore', // Ensure no I/O is exposed to the app.
+        stdio: 'ignore',
       });
 
-      processInstance.unref(); // Detach the process to allow it to run independently.
+      processInstance.unref();
       processManager.set(exePath, processInstance.pid);
+
+      // Emit status when the process starts
+      ipcRenderer.send('process-status-update', { exePath, running: true });
+
+      // Listen for process exit or error events
+      processInstance.on('exit', (code) => {
+        console.log(`Process exited: ${exePath}, code: ${code}`);
+        processManager.delete(exePath);
+        ipcRenderer.send('process-status-update', { exePath, running: false });
+      });
+
+      processInstance.on('error', (error) => {
+        console.error(`Process error: ${exePath}, error: ${error.message}`);
+        processManager.delete(exePath);
+        ipcRenderer.send('process-status-update', { exePath, running: false });
+      });
 
       return processInstance.pid;
     },
@@ -111,7 +127,7 @@ try {
         process.kill(pid, 0); // Check if the process is alive
         return true;
       } catch {
-        processManager.delete(exePath); // Cleanup if process is not running
+        processManager.delete(exePath); // Cleanup if the process is not running
         return false;
       }
     },
@@ -126,6 +142,7 @@ try {
       try {
         process.kill(pid);
         processManager.delete(exePath);
+        ipcRenderer.send('process-status-update', { exePath, running: false });
         return true;
       } catch (error) {
         throw new Error(`Failed to terminate process: ${error.message}`);

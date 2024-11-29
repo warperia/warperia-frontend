@@ -1,9 +1,11 @@
 import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { useParams } from 'react-router-dom';
 import Sidebar from "./../../Sidebar.js";
-import AddonsPage from './AddonsPage.js';
+import Tippy from '@tippyjs/react';
+import 'tippy.js/dist/tippy.css';
 import { WEB_URL } from '../../config.js';
 
+const AddonsPage = lazy(() => import('./AddonsPage.js'));
 const EditServerModal = lazy(() => import('./../../components/modals/EditServerModal.js'));
 
 const ServerPage = ({ user }) => {
@@ -14,44 +16,9 @@ const ServerPage = ({ user }) => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [serverNotFound, setServerNotFound] = useState(false);
 
-    // To-do
-    const parseSerializedPHPArray = (serializedString) => {
-        try {
-            const regex = /s:(\d+):"([^"]+)";|i:(\d+);|b:(0|1);|a:\d+:\{/g;
-            let result = {};
-            let stack = [];
-            let lastKey = null;
+    const expansion = server?.s_version || 'Unknown Expansion';
 
-            serializedString.replace(regex, (match, strLen, strVal, intVal, boolVal) => {
-                if (strVal !== undefined) {
-                    lastKey ? (result[lastKey] = strVal) : stack.push(strVal);
-                } else if (intVal !== undefined) {
-                    lastKey ? (result[lastKey] = parseInt(intVal, 10)) : stack.push(parseInt(intVal, 10));
-                } else if (boolVal !== undefined) {
-                    lastKey ? (result[lastKey] = Boolean(parseInt(boolVal, 10))) : stack.push(Boolean(parseInt(boolVal, 10)));
-                } else if (match === '{') {
-                    stack.push(result);
-                    result = {};
-                } else if (match === '}') {
-                    const temp = result;
-                    result = stack.pop();
-                    lastKey ? (result[lastKey] = temp) : stack.push(temp);
-                } else {
-                    lastKey = match.startsWith('s:') ? strVal : parseInt(intVal, 10);
-                }
-                return match;
-            });
-            return stack.length > 0 ? stack[0] : result;
-        } catch (error) {
-            console.error('Error parsing serialized PHP array:', error);
-            return [];
-        }
-    };
-
-    // To be fixed
-    const handleEditServer = () => {
-        setShowEditModal(true);
-    };
+    const handleEditServer = () => setShowEditModal(true);
 
     useEffect(() => {
         setServer(null);
@@ -69,9 +36,8 @@ const ServerPage = ({ user }) => {
                             },
                         }
                     );
-                    const data = await response.json();
-                    console.log("Fetched user data:", data);
 
+                    const data = await response.json();
                     let servers = data.meta.user_servers || [];
 
                     if (typeof servers === 'string') {
@@ -98,52 +64,54 @@ const ServerPage = ({ user }) => {
             }
         };
 
-        if (user && user.id) {
-            fetchServerData();
-        }
+        if (user && user.id) fetchServerData();
     }, [user, serverId]);
 
-    // Check if the process is running
-    const checkProcessStatus = async () => {
-        if (!server?.s_path) return;
-        try {
-            const running = await window.electron.isProcessRunning(server.s_path);
-            setIsRunning(running);
-        } catch (error) {
-            console.error('Error checking process status:', error);
-        }
-    };
+    useEffect(() => {
+        const handleProcessStatusUpdate = ({ exePath, running }) => {
+            if (server?.s_path === exePath) {
+                setIsRunning(running);
+            }
+        };
 
-    // Launch the executable
+        window.electron.ipcRenderer.on('process-status-update', handleProcessStatusUpdate);
+
+        return () => {
+            window.electron.ipcRenderer.removeListener('process-status-update', handleProcessStatusUpdate);
+        };
+    }, [server]);
+
     const handleLaunch = async () => {
         if (!server?.s_path) return;
         try {
-            const pid = await window.electron.launchExe(server.s_path);
-            setIsRunning(true);
+            await window.electron.launchExe(server.s_path);
         } catch (error) {
             console.error('Error launching executable:', error);
         }
     };
 
-    // Restart the process
     const handleRestart = async () => {
         if (!server?.s_path) return;
         try {
-            await window.electron.terminateProcess(server.s_path); // Terminate the existing process
-            const pid = await window.electron.launchExe(server.s_path); // Launch it again
-            setIsRunning(true);
+            await window.electron.terminateProcess(server.s_path);
+            await window.electron.launchExe(server.s_path);
         } catch (error) {
             console.error('Error restarting executable:', error);
         }
     };
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            checkProcessStatus(); // Poll the process status periodically
-        }, 3000);
+    const handleOpenDirectory = (directoryPath) => {
+        if (!directoryPath) {
+            return;
+        }
 
-        return () => clearInterval(interval); // Cleanup interval on component unmount
-    }, [server]);
+        try {
+            const normalizedPath = window.electron.pathNormalize(directoryPath); // Use path.normalize
+            window.electron.ipcRenderer.invoke("open-directory", normalizedPath);
+        } catch (error) {
+            // console.error("Failed to open directory:", error);
+        }
+    };
 
     if (serverNotFound) {
         return (
@@ -173,17 +141,6 @@ const ServerPage = ({ user }) => {
         );
     }
 
-    const expansion = server?.s_version || 'Unknown Expansion';
-
-    const expansionPostTypeMap = {
-        wotlk: 'addon-wotlk',
-        vanilla: 'addon-vanilla',
-        tbc: 'addon-tbc',
-        cata: 'addon-cata',
-        mop: 'addon-mop',
-    };
-    const currentPostType = expansionPostTypeMap[expansion.toLowerCase()] || 'addon-wotlk';
-
     return (
         <div className="d-flex">
             <Sidebar setPage={() => { }} />
@@ -191,7 +148,7 @@ const ServerPage = ({ user }) => {
                 <div className="container-fluid server-page">
                     <div className="row">
                         <div className="col-12 col-lg-3 left">
-                            <div className="server-info card mb-4">
+                            <div className="server-info card mb-4 sticky-top">
                                 <div className="card-body d-flex flex-column gap-3">
                                     <div className="d-flex align-items-center flex-wrap gap-2">
                                         <img
@@ -205,7 +162,7 @@ const ServerPage = ({ user }) => {
                                             <p className="card-text fw-medium text-muted">Expansion: <span className="text-uppercase">{expansion}</span></p>
                                         </div>
                                     </div>
-                                    <div className="d-flex align-items-center gap-2">
+                                    <div className="d-flex align-items-center flex-wrap gap-2">
                                         <button
                                             className="btn btn-primary"
                                             onClick={handleLaunch}
@@ -220,6 +177,14 @@ const ServerPage = ({ user }) => {
                                         >
                                             <i className="bi bi-arrow-clockwise"></i> Restart
                                         </button>
+                                        <Tippy content="Open server directory" placement="top" className="custom-tooltip">
+                                            <button
+                                                className="ms-auto btn btn-link"
+                                                onClick={() => handleOpenDirectory(server.s_dir)}
+                                            >
+                                                <i className="bi bi-folder-symlink vertical-fix"></i>
+                                            </button>
+                                        </Tippy>
                                     </div>
                                     <div className="mt-3">
                                         <ul className="nav nav-pills flex-column">
@@ -242,7 +207,7 @@ const ServerPage = ({ user }) => {
                                             <li className="nav-item">
                                                 <button
                                                     className="nav-link"
-                                                    onClick={() => setShowEditModal(true)}
+                                                    onClick={handleEditServer}
                                                 >
                                                     <i className="bi bi-gear me-2"></i> <span>Edit Server</span>
                                                 </button>
@@ -273,7 +238,7 @@ const ServerPage = ({ user }) => {
                         onClose={() => setShowEditModal(false)}
                         user={user}
                         server={server}
-                        refreshServers={() => window.location.reload()}
+                        refreshServers={() => setShowEditModal(false)}
                     />
                 </Suspense>
             )}

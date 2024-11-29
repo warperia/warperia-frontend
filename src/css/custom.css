@@ -169,6 +169,10 @@ a:hover, a:focus {
   color: #4371e0;
 }
 
+.vertical-fix {
+  vertical-align: -5px;
+}
+
 .badge {
   border-radius: 0;
 }

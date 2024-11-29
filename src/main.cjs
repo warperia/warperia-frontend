@@ -77,7 +77,7 @@ async function initializeApp() {
 
     ipcMain.on('download-progress', (event, progress) => {
         mainWindow.webContents.send('download-progress', progress);
-      });
+    });
 
     ipcMain.handle("install-update", () => {
         app.quit(); // Quit the app
@@ -127,6 +127,18 @@ async function initializeApp() {
             const result = await dialog.showOpenDialog(mainWindow, options);
             return result.filePaths;
         });
+
+        ipcMain.handle("open-directory", async (event, directoryPath) => {
+            try {
+                const normalizedPath = path.normalize(directoryPath);
+                const result = await shell.openPath(normalizedPath);
+                if (result) {
+                    // console.error("Failed to open directory:", result); 
+                }
+            } catch (error) {
+                // console.error("Error opening directory:", error);
+            }
+        });        
 
         ipcMain.on('get-user-data-path', (event) => {
             event.returnValue = app.getPath('userData');
@@ -182,6 +194,13 @@ async function initializeApp() {
 
     createWindow();
 }
+
+// Listen for World of Warcraft process status updates from the preload script
+ipcMain.on('process-status-update', (event, status) => {
+    if (mainWindow) {
+        mainWindow.webContents.send('process-status-update', status);
+    }
+});
 
 app.on('ready', initializeApp);
 
