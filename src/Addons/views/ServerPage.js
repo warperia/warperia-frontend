@@ -106,7 +106,7 @@ const ServerPage = ({ user }) => {
         }
 
         try {
-            const normalizedPath = window.electron.pathNormalize(directoryPath); // Use path.normalize
+            const normalizedPath = window.electron.pathNormalize(directoryPath);
             window.electron.ipcRenderer.invoke("open-directory", normalizedPath);
         } catch (error) {
             // console.error("Failed to open directory:", error);

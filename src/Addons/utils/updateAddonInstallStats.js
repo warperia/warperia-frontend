@@ -2,7 +2,7 @@ import axios from 'axios';
 import { WEB_URL } from './../../config.js';
 
 const updateAddonInstallStats = async (addonId, postType) => {
-  if (!postType) {
+  if (!addonId || !postType) {
     return;
   }
 
@@ -10,7 +10,7 @@ const updateAddonInstallStats = async (addonId, postType) => {
     const response = await axios.post(
       `${WEB_URL}/wp-admin/admin-ajax.php`,
       new URLSearchParams({
-        action: 'increment_addon_install',
+        action: 'increment_addon_download',
         addon_id: addonId,
         post_type: postType,
       }),
@@ -20,13 +20,14 @@ const updateAddonInstallStats = async (addonId, postType) => {
         },
       }
     );
-    
-    if (response.data.success) {
-    } else {
-    }
 
+    if (response.data.success) {
+      // console.log(`Successfully updated download stats for addon ID: ${addonId}`);
+    } else {
+      // console.error(`Failed to update download stats: ${response.data.data?.message || 'Unknown error'}`);
+    }
   } catch (error) {
+    // console.error("Error incrementing addon install stats:", error);
   }
 };
-
 export default updateAddonInstallStats;

@@ -70,9 +70,7 @@ const BrowseAddonCard = ({
             <div className="addon-meta d-flex align-items-center">
               <div className="meta-downloads fw-medium text-muted d-flex align-items-center gap-1">
                 <i className="bi bi-download"></i>
-                <span>
-                  {formatNumber(addon.custom_fields.installs || 0)} Installs
-                </span>
+                <span>{formatNumber(addon.custom_fields.installs || 0)} Installs</span>
               </div>
               <span className="mx-2 text-muted">•</span>
               <Tippy content="Addon Creator" placement="top" className="custom-tooltip">

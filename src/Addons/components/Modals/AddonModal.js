@@ -53,6 +53,7 @@ const AddonModal = ({ show, onHide, addon, loading }) => {
     };
 
     const handleOutsideClick = (event) => {
+        if (lightboxOpen) return; // Ignore clicks when the lightbox is open
         if (modalRef.current && !modalRef.current.contains(event.target)) {
             onHide();
         }
@@ -295,9 +296,23 @@ const AddonModal = ({ show, onHide, addon, loading }) => {
                 </div>
 
                 {lightboxOpen && (
-                    <div className="lightbox-overlay" onClick={closeLightbox}>
-                        <span className="lightbox-close" onClick={closeLightbox}>&times;</span>
-                        <img src={currentImage} className="lightbox-image" alt="Enlarged screenshot" />
+                    <div className="lightbox-overlay">
+                        <span className="lightbox-close" onClick={closeLightbox}>Close Images</span>
+                        <Swiper
+                            spaceBetween={10}
+                            slidesPerView={1}
+                            navigation
+                            pagination={{ clickable: true }}
+                            loop={true}
+                            modules={[Navigation, Pagination]}
+                            initialSlide={addon.custom_fields.screenshots.indexOf(currentImage)} // Start at the current image
+                        >
+                            {addon.custom_fields.screenshots.map((image, index) => (
+                                <SwiperSlide key={index}>
+                                    <img src={image} className="lightbox-image" alt={`Screenshot ${index + 1}`} />
+                                </SwiperSlide>
+                            ))}
+                        </Swiper>
                     </div>
                 )}
             </div>
