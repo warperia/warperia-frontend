@@ -390,6 +390,11 @@ a:hover, a:focus {
 .modal-add-user-server .server-game-path .btn-browse:hover {
   color: #fff;
 }
+.modal-add-user-server .server-game-realmlist .input-group-text {
+  background-color: #121212;
+  color: #fff;
+  border: 1px solid transparent;
+}
 .modal-add-user-server .alert-path-info {
   background-color: #ff9e00;
   border: none;

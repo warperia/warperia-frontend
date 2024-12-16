@@ -6,7 +6,9 @@ try {
   const versionInfo = require('win-version-info');
   const extract = require('extract-zip');
   const { spawn } = require('child_process');
+  const { exec } = require('child_process');
   const processManager = new Map();
+  const os = require('os');
 
   contextBridge.exposeInMainWorld('electron', {
 
@@ -225,6 +227,15 @@ try {
       }
     },
 
+    overwriteFile: async (filePath, fileData) => {
+      try {
+        await fs.promises.writeFile(filePath, fileData);
+      } catch (err) {
+        console.error(`Error overwriting file: ${filePath}`, err);
+        throw err;
+      }
+    },    
+
     createFolder: async (folderPath) => {
       try {
         await fs.promises.mkdir(folderPath, { recursive: true });
@@ -381,6 +392,32 @@ try {
     normalizePath: (filePath) => {
       const normalizedPath = path.normalize(filePath);
       return normalizedPath;
+    },
+
+    fixFilePermissions: (filePath) => {
+      return new Promise((resolve, reject) => {
+        if (os.platform() === 'win32') {
+          // On Windows, remove read-only attribute using "attrib" command
+          exec(`attrib -r "${filePath}"`, (error) => {
+            if (error) {
+              console.error('Error removing read-only attribute:', error);
+              reject(error);
+            } else {
+              resolve({ success: true });
+            }
+          });
+        } else {
+          // On Unix-like, try chmod 664 or similar
+          fs.chmod(filePath, 0o664, (err) => {
+            if (err) {
+              console.error('Error changing file permissions:', err);
+              reject(err);
+            } else {
+              resolve({ success: true });
+            }
+          });
+        }
+      });
     }
 
   });

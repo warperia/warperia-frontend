@@ -73,7 +73,7 @@ const BrowseAddonCard = ({
                 <span>{formatNumber(addon.custom_fields.installs || 0)} Installs</span>
               </div>
               <span className="mx-2 text-muted">•</span>
-              <Tippy content="Addon Creator" placement="top" className="custom-tooltip">
+              <Tippy content="Author" placement="top" className="custom-tooltip">
                 <div className="meta-author fw-medium text-muted">
                   {renderAddonAuthor(addon)}
                 </div>

@@ -1,6 +1,6 @@
 {
   "name": "warperia",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "World of Warcraft Private Servers Addon Manager application",
   "main": "src/main.cjs",
   "scripts": {

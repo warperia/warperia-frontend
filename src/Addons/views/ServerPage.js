@@ -8,64 +8,73 @@ import { WEB_URL } from '../../config.js';
 const AddonsPage = lazy(() => import('./AddonsPage.js'));
 const EditServerModal = lazy(() => import('./../../components/modals/EditServerModal.js'));
 
+const knownLocales = [
+    "enUS", "enGB", "deDE", "frFR", "esES", "ruRU", "zhCN", "zhTW", "koKR",
+];
+
 const ServerPage = ({ user }) => {
     const { serverId } = useParams();
     const [server, setServer] = useState(null);
+    const [serverRealmlist, setServerRealmlist] = useState("");
     const [activeTab, setActiveTab] = useState('myAddons');
     const [isRunning, setIsRunning] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [serverNotFound, setServerNotFound] = useState(false);
+    const [fetchTrigger, setFetchTrigger] = useState(0);
 
     const expansion = server?.s_version || 'Unknown Expansion';
 
     const handleEditServer = () => setShowEditModal(true);
 
-    useEffect(() => {
-        setServer(null);
-        setServerNotFound(false);
-
-        const fetchServerData = async () => {
-            try {
-                const tokenResult = await window.electron.retrieveToken();
-                if (tokenResult.success && tokenResult.token) {
-                    const response = await fetch(
-                        `${WEB_URL}/wp-json/wp/v2/users/${user.id}`,
-                        {
-                            headers: {
-                                Authorization: `Bearer ${tokenResult.token}`,
-                            },
-                        }
-                    );
-
-                    const data = await response.json();
-                    let servers = data.meta.user_servers || [];
-
-                    if (typeof servers === 'string') {
-                        servers = JSON.parse(servers);
-                    } else if (!Array.isArray(servers)) {
-                        servers = Object.values(servers);
+    // Extracted fetch logic into its own function
+    const fetchServerData = async () => {
+        try {
+            const tokenResult = await window.electron.retrieveToken();
+            if (tokenResult.success && tokenResult.token) {
+                const response = await fetch(
+                    `${WEB_URL}/wp-json/wp/v2/users/${user.id}`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${tokenResult.token}`,
+                        },
                     }
+                );
 
-                    const matchedServer = servers.find((s, index) => {
-                        const id = s.id || index.toString();
-                        return id === serverId;
-                    });
+                const data = await response.json();
+                let servers = data.meta.user_servers || [];
 
-                    if (matchedServer) {
-                        setServer(matchedServer);
-                    } else {
-                        console.warn('Server not found for the given ID.');
-                        setServerNotFound(true);
-                    }
+                if (typeof servers === 'string') {
+                    servers = JSON.parse(servers);
+                } else if (!Array.isArray(servers)) {
+                    servers = Object.values(servers);
                 }
-            } catch (error) {
-                console.error('Error fetching server data:', error);
-                setServerNotFound(true);
-            }
-        };
 
-        if (user && user.id) fetchServerData();
-    }, [user, serverId]);
+                const matchedServer = servers.find((s, index) => {
+                    const id = s.id || index.toString();
+                    return id === serverId;
+                });
+
+                if (matchedServer) {
+                    setServer(matchedServer);
+                } else {
+                    console.warn('Server not found for the given ID.');
+                    setServerNotFound(true);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching server data:', error);
+            setServerNotFound(true);
+        }
+    };
+
+    // Refresh data
+    useEffect(() => {
+        if (user && user.id) {
+            setServer(null);
+            setServerNotFound(false);
+            fetchServerData();
+        }
+    }, [user, serverId, fetchTrigger]);
 
     useEffect(() => {
         const handleProcessStatusUpdate = ({ exePath, running }) => {
@@ -111,6 +120,78 @@ const ServerPage = ({ user }) => {
         } catch (error) {
             // console.error("Failed to open directory:", error);
         }
+    };
+
+    // Detect realmlist after server data is fetched and we have s_path and s_version
+    useEffect(() => {
+        const detectRealmlist = async () => {
+            if (!server?.s_path || !server?.s_version) return;
+
+            const gameVersion = server.s_version;
+            const dirPath = server.s_dir;
+            if (!dirPath || !gameVersion) return;
+
+            // Determine if Mists of Pandaria expansion
+            const isMop = (gameVersion.toLowerCase() === 'mop');
+            const dataDir = await window.electron.pathJoin(dirPath, "Data");
+
+            try {
+                const directories = await window.electron.readDir(dataDir);
+                const locale = directories.find((d) => knownLocales.includes(d));
+                if (!locale) return; // No locale found
+
+                const realmlistFilePath = await window.electron.pathJoin(dataDir, locale, "realmlist.wtf");
+                const realmlistExists = await window.electron.fileExists(realmlistFilePath);
+                let realmlistValue = "";
+
+                if (realmlistExists) {
+                    const realmlistContent = await window.electron.readFile(realmlistFilePath);
+                    realmlistValue = parseRealmlistFromContent(realmlistContent, false);
+                }
+
+                let configRealmlistValue = "";
+                if (isMop) {
+                    const configPath = await window.electron.pathJoin(dirPath, "WTF", "Config.wtf");
+                    const configExists = await window.electron.fileExists(configPath);
+                    if (configExists) {
+                        const configContent = await window.electron.readFile(configPath);
+                        configRealmlistValue = parseRealmlistFromContent(configContent, true);
+                    }
+                }
+
+                const finalRealmlist = realmlistValue || configRealmlistValue || "";
+                setServerRealmlist(finalRealmlist);
+            } catch (err) {
+                console.error("Error detecting realmlist on ServerPage:", err);
+            }
+        };
+
+        detectRealmlist();
+    }, [server]);
+
+    const parseRealmlistFromContent = (content, isMop) => {
+        let lines = content.split("\n").map((l) => l.trim());
+        let match = null;
+        if (isMop) {
+            match = lines.find((l) => l.toLowerCase().startsWith("set realmlist "));
+            if (!match) {
+                match = lines.find((l) => l.toUpperCase().startsWith("SET REALMLIST "));
+            }
+            if (match) {
+                const regex = /SET\s+realmlist\s+"([^"]+)"/i;
+                const found = match.match(regex);
+                return found ? found[1] : "";
+            }
+        } else {
+            match = lines.find((l) => l.toLowerCase().startsWith("set realmlist"));
+            if (match) {
+                const parts = match.split(/\s+/);
+                if (parts.length > 2) {
+                    return parts.slice(2).join(" ");
+                }
+            }
+        }
+        return "";
     };
 
     if (serverNotFound) {
@@ -159,7 +240,12 @@ const ServerPage = ({ user }) => {
                                         />
                                         <div>
                                             <h3 className="card-title text-white fw-bold h4">{server.s_name || 'Unnamed Server'}</h3>
-                                            <p className="card-text fw-medium text-muted">Expansion: <span className="text-uppercase">{expansion}</span></p>
+                                            <p className="card-text fw-medium text-muted mb-0"><strong>Expansion:</strong> <span className="text-uppercase">{expansion}</span></p>
+                                            {serverRealmlist && (
+                                                <p className="card-text fw-medium text-muted">
+                                                    <strong>Realmlist:</strong> <span>{serverRealmlist}</span>
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="d-flex align-items-center flex-wrap gap-2">
@@ -238,7 +324,10 @@ const ServerPage = ({ user }) => {
                         onClose={() => setShowEditModal(false)}
                         user={user}
                         server={server}
-                        refreshServers={() => setShowEditModal(false)}
+                        refreshServers={() => {
+                            setShowEditModal(false);
+                            setFetchTrigger(prev => prev + 1);
+                        }}
                     />
                 </Suspense>
             )}
