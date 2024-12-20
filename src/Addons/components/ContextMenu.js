@@ -43,7 +43,7 @@ const ContextMenu = ({ xPos, yPos, onReinstall, onDelete, onViewAddon, onReport,
     >
       <div className="d-flex flex-column align-items-center">
         <div className="d-flex align-items-center gap-3 context-menu-top w-100 p-2">
-          <img src={addonImage} alt={addonName} className="img-fluid rounded" style={{ maxWidth: '40px', maxHeight: '40px' }} />
+          <img src={addonImage} alt={addonName} className="img-fluid rounded" />
           <div className="addon-name text-light fw-bold">{addonName}</div>
         </div>
         <div className="context-menu-bottom w-100">

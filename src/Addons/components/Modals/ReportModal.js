@@ -38,7 +38,7 @@ const ReportModal = ({ show, onClose, onSubmit, addonName }) => {
             {show && <div className="modal-overlay"></div>}
             <div className={`modal ${show ? 'show' : ''}`} tabIndex="-1" style={{ display: show ? 'block' : 'none' }}>
                 <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable modal-dark modal-fixed-height">
-                    <div className="modal-content rounded-0">
+                    <div className="modal-content">
                         <div className="modal-header">
                             <h5 className="modal-title">Report Addon: {addonName}</h5>
                             <button type="button" className="btn-close btn-close-white" aria-label="Close" onClick={onClose}></button>
@@ -58,7 +58,7 @@ const ReportModal = ({ show, onClose, onSubmit, addonName }) => {
                                         </div>
                                     )}
                                     <textarea
-                                        className="form-control rounded-0"
+                                        className="form-control"
                                         placeholder="Describe the issue you are experiencing with this addon"
                                         value={details}
                                         onChange={(e) => setDetails(e.target.value)}
@@ -71,18 +71,19 @@ const ReportModal = ({ show, onClose, onSubmit, addonName }) => {
                                 <>
                                     <button
                                         type="button"
-                                        className="btn btn-primary rounded-0"
+                                        className="btn btn-secondary"
+                                        onClick={onClose}
+                                    >
+                                        Cancel
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
                                         onClick={handleReportSubmit}
                                         disabled={!details}
                                     >
                                         Submit Report
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary rounded-0"
-                                        onClick={onClose}
-                                    >
-                                        Close
                                     </button>
                                 </>
                             )}

@@ -9,1287 +9,1360 @@ $color-1: #0d0c0c;
 $color-2: #121212;
 
 html {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    position: relative;
-    scroll-behavior: smooth;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  scroll-behavior: smooth;
 }
 
 body {
-    height: 100%;
-    margin: 0;
-    background-color: $color-1;
-    color: #fff;
-    font-family: "Fustat", sans-serif;
-    text-rendering: auto;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    position: relative;
+  height: 100%;
+  margin: 0;
+  background-color: $color-1;
+  color: #fff;
+  font-family: "Fustat", sans-serif;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
 }
 
 a {
-    text-decoration: none;
+  text-decoration: none;
 
-    &:hover,
-    &:focus {
-        color: $base-color-4;
-        text-decoration: none;
-    }
+  &:hover,
+  &:focus {
+    color: $base-color-4;
+    text-decoration: none;
+  }
 }
 
 .content {
-    margin-left: 80px;
-    padding-top: 2rem;
-    padding-bottom: 5rem;
+  margin-left: 80px;
+  padding-top: 2rem;
+  padding-bottom: 5rem;
 }
 
 // Bootstrap Overrides
 .bg-dark {
-    background-color: $base-color-2 !important;
+  background-color: $base-color-2 !important;
 }
 
 .text-primary {
-    color: $base-color-4 !important;
+  color: $base-color-4 !important;
 }
 
 .text-primary-lighter {
-    color: #0f93ff;
+  color: #0f93ff;
 }
 
 .text-success {
-    color: #28a745 !important;
+  color: #28a745 !important;
 }
 
 .text-muted {
-    color: #9a9a9a !important;
+  color: #9a9a9a !important;
 }
 
 .text-danger {
-    color: #f10040 !important;
+  color: #f10040 !important;
 }
 
 .form-control {
-    background-color: $base-color-2;
-    border-color: rgba(255, 255, 255, 0.1);
+  background-color: $base-color-2;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+
+  &:hover,
+  &:focus {
+    background-color: $base-color-3;
+    border-color: $base-color-4;
     color: #fff;
+    box-shadow: none;
+  }
 
-    &:hover,
-    &:focus {
-        background-color: $base-color-3;
-        border-color: $base-color-4;
-        color: #fff;
-        box-shadow: none;
-    }
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
 
-    &::placeholder {
-        color: rgba(255, 255, 255, 0.5);
-    }
-
-    &:read-only {
-        background-color: $base-color-2;
-    }
+  &:read-only {
+    background-color: $base-color-2;
+  }
 }
 
 .btn {
-    &:focus {
-        box-shadow: none !important;
-        text-decoration: none;
-    }
+  &:focus {
+    box-shadow: none !important;
+    text-decoration: none;
+  }
 }
 
 .btn-primary {
-    background-color: rgba(67, 113, 224, .5);
+  background-color: #4371e0;
+  color: #fff;
+  border: 1px solid #4371e0;
+  font-weight: 500;
+
+  &:hover,
+  &:focus,
+  &:active {
+    background-color: #4e82ff;
+    border-color: #4e82ff;
     color: #fff;
-    border: 1px solid rgba(67, 113, 224, .5);
-    font-weight: 500;
+    box-shadow: none;
+  }
 
-    &:hover,
-    &:focus,
-    &:active {
-        background-color: rgba(67, 113, 224, .7);
-        color: #fff;
-        box-shadow: none;
-    }
-
-    &:disabled {
-        background-color: $base-color-4;
-        border-color: $base-color-4;
-    }
+  &:disabled {
+    background-color: $base-color-4;
+    border-color: $base-color-4;
+  }
 }
 
 .btn-secondary {
-    background-color: $base-color-2;
-    border-color: $base-color-3;
+  background-color: $base-color-2;
+  border-color: $base-color-3;
 
-    &:hover,
-    &:focus,
-    &:active {
-        background-color: $base-color-3 !important;
-        border-color: $base-color-3 !important;
-    }
+  &:hover,
+  &:focus,
+  &:active {
+    background-color: $base-color-3 !important;
+    border-color: $base-color-3 !important;
+  }
 
-    &:disabled {
-        background: #414141;
-        border-color: #4f4f4f;
-    }
+  &:disabled {
+    background: #414141;
+    border-color: #4f4f4f;
+  }
 }
 
 .btn-secondary-2 {
+  background-color: #313131;
+  color: #fff;
+
+  &:hover {
     background-color: #313131;
     color: #fff;
-
-    &:hover {
-        background-color: #313131;
-        color: #fff;
-        outline: 1px solid rgba(255, 255, 255, .1);
-    }
+    outline: 1px solid rgba(255, 255, 255, 0.1);
+  }
 }
 
 .btn-outline-secondary {
-    border-color: $base-color-3;
-    color: #9a9a9a;
+  border-color: $base-color-3;
+  color: #9a9a9a;
 
-    &:hover {
-        background-color: transparent;
-        border-color: #fff;
-        color: #fff;
-    }
+  &:hover {
+    background-color: transparent;
+    border-color: #fff;
+    color: #fff;
+  }
 }
 
 .btn-outline-secondary-2 {
+  border-color: #595858;
+  color: #9a9a9a;
+
+  &:hover,
+  &:active {
+    background-color: transparent !important;
+    border-color: #fff !important;
+    color: #fff !important;
+  }
+
+  &:disabled {
     border-color: #595858;
     color: #9a9a9a;
-
-    &:hover,
-    &:active {
-        background-color: transparent !important;
-        border-color: #fff !important;
-        color: #fff !important;
-    }
-
-    &:disabled {
-        border-color: #595858;
-        color: #9a9a9a;
-        opacity: .8;
-    }
+    opacity: 0.8;
+  }
 }
 
 .btn-danger {
-    color: #ffffff;
-    background-color: rgba(241, 0, 64, .5);
-    border: 1px solid rgba(241, 0, 64, .5);
+  color: #ffffff;
+  background-color: rgba(241, 0, 64, 0.5);
+  border: 1px solid rgba(241, 0, 64, 0.5);
 
-    &:hover,
-    &:focus,
-    &:active {
-        background-color: rgba(241, 0, 64, .7) !important;
-    }
+  &:hover,
+  &:focus,
+  &:active {
+    background-color: rgba(241, 0, 64, 0.7) !important;
+  }
 }
 
 .btn-link {
-    color: #9a9a9a;
-    font-weight: 500;
-    text-decoration: none;
+  color: #9a9a9a;
+  font-weight: 500;
+  text-decoration: none;
 
-    &:hover {
-        text-decoration: none;
-        box-shadow: none;
-        color: $base-color-4;
-    }
+  &:hover {
+    text-decoration: none;
+    box-shadow: none;
+    color: $base-color-4;
+  }
 }
 
 .vertical-fix {
-    vertical-align: -5px;
+  vertical-align: -5px;
 }
 
 .badge {
-    border-radius: 0;
+  border-radius: 0;
 }
 
 .dropdown-custom-dark {
-    background-color: #1e1e1e;
-    border-radius: 0;
+  background-color: #1e1e1e;
+  border-radius: 0;
 
-    .dropdown-item {
-        color: #ebebeb;
+  .dropdown-item {
+    color: #ebebeb;
 
-        &:hover {
-            background-color: rgba(255, 255, 255, .1);
-            color: #fff;
-        }
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: #fff;
     }
+  }
 }
 
 .input-group-secondary {
-    .form-control {
-        background-color: #3b3b3b;
-    }
+  .form-control {
+    background-color: #3b3b3b;
+  }
 }
 
 .toast-container {
-    z-index: 9999 !important;
+  z-index: 9999 !important;
 }
 
 .spinner-addon-title {
-    width: 15px;
-    height: 15px;
-    font-size: 10px;
+  width: 15px;
+  height: 15px;
+  font-size: 10px;
 }
 
 .alert {
-    font-weight: 500;
+  font-weight: 500;
 }
 
 .alert-danger {
-    background-color: #670000;
-    border: none;
-    color: white;
+  background-color: #670000;
+  border: none;
+  color: white;
 }
 
 .alert-success {
-    background-color: green;
-    border: none;
-    color: white;
+  background-color: green;
+  border: none;
+  color: white;
 }
 
 .alert-info {
-    background-color: #002f3e;
-    border: none;
-    color: white;
+  background-color: #002f3e;
+  border: none;
+  color: white;
 }
 
 .alert-medium {
-    background-color: $base-color-3;
-    border: none;
+  background-color: $base-color-3;
+  border: none;
 }
 
 .toast {
+  border: none;
+
+  .toast-header {
+    background-color: $base-color-3;
     border: none;
+    color: white;
+    font-weight: 600;
+  }
 
-    .toast-header {
-        background-color: $base-color-3;
-        border: none;
-        color: white;
-        font-weight: 600;
-    }
-
-    .toast-body {
-        background-color: $base-color-2;
-        color: #fff;
-        font-weight: 500;
-    }
+  .toast-body {
+    background-color: $base-color-2;
+    color: #fff;
+    font-weight: 500;
+  }
 }
 
 .custom-tooltip {
-    background-color: $base-color-2;
-    color: #fff;
-    box-shadow: 0px 0px 8px 0px #0f0f0f;
-    opacity: 1;
+  background-color: $base-color-2;
+  color: #fff;
+  box-shadow: 0px 0px 8px 0px #0f0f0f;
+  opacity: 1;
 
-    .tippy-arrow {
-        color: $base-color-2;
-    }
+  .tippy-arrow {
+    color: $base-color-2;
+  }
 }
 
 .fw-bolder {
-    font-weight: 900 !important;
+  font-weight: 900 !important;
 }
 
 .modal-dark {
-    .modal-content {
-        background-color: $base-color-2;
-        border-radius: 1rem;
+  .modal-content {
+    background-color: $base-color-2;
+    border-radius: 1rem;
 
-        .modal-header {
-            background: #101010;
-            border-bottom: 1px solid rgba(255, 255, 255, .1);
-        }
-
-        .addon-logo {
-            -webkit-box-flex: 0;
-            -moz-box-flex: 0;
-            box-flex: 0;
-            -webkit-flex: 0 0 auto;
-            flex: 0 0 auto;
-            margin-right: 15px;
-            align-self: center;
-
-            img {
-                width: 80px;
-                height: 80px;
-                object-fit: cover;
-            }
-        }
-
-        .addon-meta {
-            .categories {
-                font-size: 14px;
-            }
-        }
-
-        .addon-content {
-            color: rgba(255, 255, 255, .9);
-
-            .content {
-                margin: 0;
-                padding: 0;
-            }
-
-            blockquote {
-                background-color: rgba(255, 255, 255, .1);
-                padding: .5rem;
-            }
-        }
-
-        .swiper {
-            padding: 1rem;
-        }
-
-        .modal-footer {
-            border-top: 1px solid rgba(255, 255, 255, .1);
-        }
+    .modal-header {
+      background: #101010;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
+    .addon-logo {
+      -webkit-box-flex: 0;
+      -moz-box-flex: 0;
+      box-flex: 0;
+      -webkit-flex: 0 0 auto;
+      flex: 0 0 auto;
+      margin-right: 15px;
+      align-self: center;
+
+      img {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+      }
+    }
+
+    .addon-meta {
+      .categories {
+        font-size: 14px;
+      }
+    }
+
+    .addon-content {
+      color: rgba(255, 255, 255, 0.9);
+
+      .content {
+        margin: 0;
+        padding: 0;
+      }
+
+      blockquote {
+        background-color: rgba(255, 255, 255, 0.1);
+        padding: 0.5rem;
+      }
+    }
+
+    .swiper {
+      padding: 1rem;
+    }
+
+    .modal-footer {
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  }
 }
 
 .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-    z-index: 1040;
-    display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 1040;
+  display: block;
 }
 
 .modal-switch-variations {
-    .list-group {
+  .list-group {
+    .list-group-item {
+      background-color: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0;
+      padding: 1rem;
 
-        .list-group-item {
-            background-color: transparent;
-            border: none;
-            border-bottom: 1px solid rgba(255, 255, 255, .1);
-            border-radius: 0;
-            padding: 1rem;
+      h6 {
+        color: #fff;
+      }
 
-            h6 {
-                color: #fff;
-            }
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+      }
 
-            &:hover {
-                background-color: rgba(255, 255, 255, .1);
-            }
-
-            &:last-of-type {
-                border-bottom: none;
-            }
-        }
+      &:last-of-type {
+        border-bottom: none;
+      }
     }
+  }
 }
 
 .modal-fixed-height {
-    .modal-content {
-        max-height: 600px !important;
-    }
+  .modal-content {
+    max-height: 600px !important;
+  }
 }
 
 .modal-add-user-server {
-    .modal-content {
-        border-radius: 1rem !important;
+  .modal-content {
+    border-radius: 1rem !important;
 
-        .modal-header {
-            background: #101010;
-        }
-
-        .modal-footer {
-            button {
-                border-radius: .5rem;
-            }
-
-            button.btn-secondary {
-                background-color: #313131;
-            }
-
-            .btn-delete {
-                color: #ff4141 !important;
-                font-weight: 600;
-
-                &:hover {
-                    background-color: rgba(255, 255, 255, .1);
-                }
-            }
-        }
+    .modal-header {
+      background: #101010;
     }
 
-    .server-logo {
-        img {
-            width: 100px;
-            height: 100px;
-            border-radius: .5rem;
-            object-fit: cover;
-            cursor: pointer;
+    .modal-footer {
+      button {
+        border-radius: 0.5rem;
+      }
 
-            &:hover {
-                opacity: .8;
-            }
-        }
-
-        button {
-            width: fit-content;
-        }
-    }
-
-    .server-game-version {
-        button {
-            background-color: #313131;
-            border-radius: .5rem;
-            border: 1px solid transparent;
-            font-weight: 500;
-            color: #ccc;
-
-            &:hover,
-            &:active,
-            &:focus {
-                border-color: $base-color-4;
-            }
-        }
-
-        button.active {
-            background-color: rgb(67, 113, 224, .5);
-            border-color: #4371e0;
-            color: #fff;
-        }
-    }
-
-    .server-game-path {
-        .btn-browse {
-            border-color: transparent;
-            color: #9a9a9a;
-            left: 160px;
-            top: 19px !important;
-
-            &:hover {
-                color: #fff;
-            }
-        }
-    }
-
-    .server-game-realmlist {
-        .input-group-text {
-            background-color: #121212;
-            color: #fff;
-            border: 1px solid transparent;
-        }
-    }
-
-    .alert-path-info {
-        background-color: #ff9e00;
-        border: none;
-        color: #121212;
-        padding: .375rem .75rem;
-    }
-
-    .alert-path-success {
-        background-color: #afe043;
-        border: none;
-        color: #121212;
-        padding: .375rem .75rem;
-    }
-
-    .form-control {
+      button.btn-secondary {
         background-color: #313131;
-        border: 1px solid transparent;
-        border-radius: .5rem;
-        width: 100%;
-        max-width: 500px;
-        padding: .5rem .75rem;
+      }
 
-        &:hover,
-        &:active,
-        &:focus {
-            border-color: $base-color-4;
+      .btn-delete {
+        color: #ff4141 !important;
+        font-weight: 600;
+
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.1);
         }
+      }
     }
+  }
+
+  .server-logo {
+    img {
+      width: 100px;
+      height: 100px;
+      border-radius: 0.5rem;
+      object-fit: cover;
+      cursor: pointer;
+
+      &:hover {
+        opacity: 0.8;
+      }
+    }
+
+    button {
+      width: fit-content;
+    }
+  }
+
+  .server-game-version {
+    button {
+      background-color: #313131;
+      border-radius: 0.5rem;
+      border: 1px solid transparent;
+      font-weight: 500;
+      color: #ccc;
+
+      &:hover,
+      &:active,
+      &:focus {
+        border-color: $base-color-4;
+      }
+    }
+
+    button.active {
+      background-color: rgb(67, 113, 224, 0.5);
+      border-color: #4371e0;
+      color: #fff;
+    }
+  }
+
+  .server-game-path {
+    .btn-browse {
+      border-color: transparent;
+      color: #9a9a9a;
+      left: 160px;
+      top: 19px !important;
+
+      &:hover {
+        color: #fff;
+      }
+    }
+  }
+
+  .server-game-realmlist {
+    .input-group-text {
+      background-color: #121212;
+      color: #fff;
+      border: 1px solid transparent;
+    }
+  }
+
+  .alert-path-info {
+    background-color: #ff9e00;
+    border: none;
+    color: #121212;
+    padding: 0.375rem 0.75rem;
+  }
+
+  .alert-path-success {
+    background-color: #afe043;
+    border: none;
+    color: #121212;
+    padding: 0.375rem 0.75rem;
+  }
+
+  .form-control {
+    background-color: #313131;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    width: 100%;
+    max-width: 500px;
+    padding: 0.5rem 0.75rem;
+
+    &:hover,
+    &:active,
+    &:focus {
+      border-color: $base-color-4;
+    }
+  }
 }
 
 .delete-modal-overlay {
-    z-index: 1060;
+  z-index: 1060;
 }
 
 .modal-delete {
-    z-index: 1065;
+  z-index: 1065;
 
-    .modal-content {
-        border-radius: 1rem;
-    }
+  .modal-content {
+    border-radius: 1rem;
+  }
 }
 
 // Custom Lightbox
 .lightbox-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+
+  .lightbox-image {
+    max-width: 90%;
+    max-height: 90%;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1050;
+    margin: 0 auto;
+    text-align: center;
+    display: block;
+  }
 
-    .lightbox-image {
-        max-width: 90%;
-        max-height: 90%;
-        width: 100%;
-        height: 100%;
-        margin: 0 auto;
-        text-align: center;
-        display: block;
+  .lightbox-close {
+    position: absolute;
+    top: 40px;
+    right: 50px;
+    font-size: 16px;
+    font-weight: 600;
+    color: white;
+    cursor: pointer;
+    z-index: 1051;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.375rem 0.5rem;
+    border-radius: 0.5rem;
+    transition: all 0.3s;
+
+    &:hover {
+      transition: all 0.3s;
+      transform: scale(1.05);
+      background-color: #fff;
+      color: #121212;
     }
-
-    .lightbox-close {
-        position: absolute;
-        top: 40px;
-        right: 50px;
-        font-size: 16px;
-        font-weight: 600;
-        color: white;
-        cursor: pointer;
-        z-index: 1051;
-        background: rgba(255, 255, 255, .1);
-        padding: .375rem .5rem;
-        border-radius: .5rem;
-        transition: all .3s;
-
-        &:hover {
-            transition: all .3s;
-            transform: scale(1.05);
-            background-color: #fff;
-            color: #121212;
-        }
-    }
-
+  }
 }
 
 .addon-screenshot {
-    height: 200px;
-    object-fit: cover;
+  height: 200px;
+  object-fit: cover;
 }
 
 .addon-developers {
-    .item-developer {
-        background-color: rgba(255, 255, 255, .1);
-        padding: .5rem;
-    }
+  .item-developer {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 0.5rem;
+  }
 }
 
 // Authentication Pages
 .auth-container {
-    max-width: 400px;
+  max-width: 400px;
 
-    .logo {
-        max-width: 200px;
-    }
+  .logo {
+    max-width: 200px;
+  }
 }
 
 // User Settings Page
 .user-settings {
-    .avatar {
+  .avatar {
+    img {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+
+      &:hover {
+        opacity: 0.4;
+        cursor: pointer;
+      }
+    }
+
+    .edit-icon {
+      display: none;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .edit-icon:hover ~ img {
+      opacity: 0.4;
+      cursor: pointer;
+    }
+
+    img:hover ~ .edit-icon {
+      display: block;
+    }
+  }
+
+  .username {
+    font-weight: 600;
+    font-size: 20px;
+  }
+
+  .email {
+    color: #9a9a9a;
+    font-weight: 500;
+  }
+
+  .center-part {
+    .nav-tabs {
+      border: none;
+      margin-bottom: 2rem;
+
+      .nav-item {
+        .nav-link {
+          color: #9a9a9a;
+          border: none;
+          border-bottom: transparent;
+
+          &:hover {
+            color: #fff;
+          }
+        }
+
+        .nav-link.active {
+          background: transparent;
+          border: none;
+          border-bottom: 1px solid $base-color-4;
+          color: #fff;
+        }
+      }
+    }
+
+    .game-directories {
+      .input-group {
+        input {
+          padding-right: 70px;
+        }
+
+        .btn-clear {
+          position: absolute;
+          right: 0;
+          top: 0;
+          bottom: 0;
+          z-index: 3;
+          background: transparent;
+          border: none;
+        }
+      }
+
+      .form-control {
+        &:hover {
+          cursor: pointer;
+        }
+      }
+
+      .field-title {
+        margin-bottom: 0.5rem;
+
         img {
-            width: 100px;
-            height: 100px;
-            object-fit: cover;
-
-            &:hover {
-                opacity: 0.4;
-                cursor: pointer;
-            }
+          width: 32px;
+          height: 32px;
         }
 
-        .edit-icon {
-            display: none;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
+        .form-label {
+          margin-bottom: 0;
+        }
+      }
+
+      .detected-version {
+        .badge.bg-success {
+          background-color: green !important;
         }
 
-        .edit-icon:hover~img {
-            opacity: 0.4;
-            cursor: pointer;
+        .badge.bg-danger {
+          background-color: red !important;
         }
-
-        img:hover~.edit-icon {
-            display: block;
-        }
+      }
     }
-
-    .username {
-        font-weight: 600;
-        font-size: 20px;
-    }
-
-    .email {
-        color: #9a9a9a;
-        font-weight: 500;
-    }
-
-    .center-part {
-        .nav-tabs {
-            border: none;
-            margin-bottom: 2rem;
-
-            .nav-item {
-                .nav-link {
-                    color: #9a9a9a;
-                    border: none;
-                    border-bottom: transparent;
-
-                    &:hover {
-                        color: #fff;
-                    }
-                }
-
-                .nav-link.active {
-                    background: transparent;
-                    border: none;
-                    border-bottom: 1px solid $base-color-4;
-                    color: #fff;
-                }
-            }
-        }
-
-        .game-directories {
-            .input-group {
-                input {
-                    padding-right: 70px;
-                }
-
-                .btn-clear {
-                    position: absolute;
-                    right: 0;
-                    top: 0;
-                    bottom: 0;
-                    z-index: 3;
-                    background: transparent;
-                    border: none;
-                }
-            }
-
-            .form-control {
-                &:hover {
-                    cursor: pointer;
-                }
-            }
-
-            .field-title {
-                margin-bottom: 0.5rem;
-
-                img {
-                    width: 32px;
-                    height: 32px;
-                }
-
-                .form-label {
-                    margin-bottom: 0;
-                }
-            }
-
-            .detected-version {
-                .badge.bg-success {
-                    background-color: green !important;
-                }
-
-                .badge.bg-danger {
-                    background-color: red !important;
-                }
-            }
-        }
-    }
+  }
 }
 
 // Addon Pages
 .sticky-header {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    background-color: #333;
-    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background-color: #333;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .page-addons {
-    .card-addon {
-        .wrapper {
-            position: relative;
-            margin: 0.5rem;
+  .card-addon {
+    .wrapper {
+      position: relative;
+      margin: 0.5rem;
 
-            .image {
-                position: relative;
-                margin: 10px;
-                flex: 0 0 auto;
+      .image {
+        position: relative;
+        margin: 10px;
+        flex: 0 0 auto;
 
-                img {
-                    width: 110px;
-                    height: 110px;
-                    object-fit: cover;
-                }
-
-                button {
-                    display: none;
-                    margin: auto;
-                    top: 0;
-                    left: 0;
-                    bottom: 0;
-                    right: 0;
-                    border-radius: 0;
-                    opacity: 1;
-                    background-color: $base-color-4;
-                    border-color: $base-color-4;
-                    position: absolute;
-                    font-weight: 600;
-                    width: 90%;
-                    height: 10px;
-                    padding: 1rem;
-                    line-height: 2px;
-                    // z-index: 1;
-                    transition: opacity .3s ease;
-
-                    &:hover {
-                        background-color: $base-color-5;
-                    }
-                }
-
-                .btn-installed {
-                    background-color: #28a745;
-                    border-color: #198754;
-                    color: #fff;
-                    opacity: 1;
-                    display: block;
-
-                    &:hover {
-                        background-color: #28a745;
-                        border-color: #198754;
-                        color: #fff;
-                    }
-                }
-
-                .btn-update {
-                    display: block;
-                    background: #ffc107;
-                    border-color: #ffc928;
-                    color: #111;
-
-                    &:hover {
-                        background-color: #ffc928;
-                    }
-                }
-
-                .progress-bar {
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    height: 1px;
-                    width: 100%;
-                    background-color: #4caf50;
-                    z-index: 2;
-                }
-
-                &.installing button {
-                    display: block;
-                }
-
-                &:hover button {
-                    display: block;
-                }
-            }
-
-            .details {
-                flex: 1;
-            }
-
-            &:hover .image button {
-                display: block;
-            }
-
+        img {
+          width: 110px;
+          height: 110px;
+          object-fit: cover;
         }
+
+        button {
+          display: none;
+          margin: auto;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          right: 0;
+          border-radius: 0;
+          opacity: 1;
+          background-color: $base-color-4;
+          border-color: $base-color-4;
+          position: absolute;
+          font-weight: 600;
+          width: 90%;
+          height: 10px;
+          padding: 1rem;
+          line-height: 2px;
+          // z-index: 1;
+          transition: opacity 0.3s ease;
+
+          &:hover {
+            background-color: $base-color-5;
+          }
+        }
+
+        .btn-installed {
+          background-color: #28a745;
+          border-color: #198754;
+          color: #fff;
+          opacity: 1;
+          display: block;
+
+          &:hover {
+            background-color: #28a745;
+            border-color: #198754;
+            color: #fff;
+          }
+        }
+
+        .btn-update {
+          display: block;
+          background: #ffc107;
+          border-color: #ffc928;
+          color: #111;
+
+          &:hover {
+            background-color: #ffc928;
+          }
+        }
+
+        .progress-bar {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          height: 1px;
+          width: 100%;
+          background-color: #4caf50;
+          z-index: 2;
+        }
+
+        &.installing button {
+          display: block;
+        }
+
+        &:hover button {
+          display: block;
+        }
+      }
+
+      .details {
+        flex: 1;
+      }
+
+      &:hover .image button {
+        display: block;
+      }
+    }
+  }
+
+  .single-addon-row {
+    margin-top: 0;
+
+    &:first-of-type {
+      margin-top: 3.5rem;
     }
 
-    .single-addon-row {
-        margin-top: 0;
+    hr {
+      border-color: rgba(255, 255, 255, 0.1);
+      opacity: 1;
+    }
+  }
 
-        &:first-of-type {
-            margin-top: 3.5rem;
+  .my-addon-card {
+    background-color: #191919;
+    border: none;
+    border-radius: 1rem;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+
+    .wrapper {
+      padding: 0;
+      margin: 0;
+
+      .image {
+        margin: 0 10px 0 0;
+
+        img {
+          width: 50px;
+          height: 50px;
+          border-radius: 0.5rem;
+        }
+      }
+
+      .details {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: nowrap;
+        gap: 1rem;
+
+        .addon-title {
+          flex-grow: 1;
+          align-self: center;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
-        hr {
-            border-color: rgba(255, 255, 255, .1);
-            opacity: 1;
+        .addon-version {
+          flex-shrink: 0;
+          align-self: center;
         }
+
+        .btn-secondary {
+          flex-shrink: 0;
+          margin-right: 1rem;
+
+          &:hover {
+            border-color: rgba(255, 255, 255, 0.2) !important;
+          }
+        }
+      }
     }
 
-    .my-addon-card {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+
+      .details {
+        .btn-secondary {
+          border-color: rgba(255, 255, 255, 0.2);
+        }
+      }
+    }
+  }
+
+  .browse-addon-card {
+    background-color: #1f1f1f;
+    border-radius: 1rem;
+
+    .wrapper {
+      .image {
+        img {
+          border-radius: 0.5rem;
+        }
+      }
+
+      .details {
+        flex-direction: column;
+      }
+    }
+  }
+
+  .nav-tabs {
+    border: none;
+    margin-bottom: 2rem;
+
+    .nav-item {
+      .nav-link {
+        color: #9a9a9a;
+        border: none;
+        border-bottom: transparent;
+
+        &:hover {
+          color: #fff;
+        }
+      }
+
+      .nav-link.active {
+        background: transparent;
+        border: none;
+        border-bottom: 1px solid $base-color-4;
+        color: #fff;
+      }
+    }
+  }
+
+  .banner {
+    width: 100px;
+  }
+
+  .addon-search-input {
+    input {
+      background-color: #171717 !important;
+    }
+  }
+
+  .table-addons-installed {
+    border-collapse: separate;
+    border-spacing: 0 .5rem;
+
+    thead {
+      background-color: transparent;
+
+      tr {
+        th {
+          background-color: transparent;
+          color: #fff;
+          border-bottom: none;
+          padding: 1rem 0 0 1rem;
+        }
+      }
+    }
+
+    tbody {
+      tr {
         background-color: #191919;
         border: none;
         border-radius: 1rem;
-        padding: 1rem;
-        margin-bottom: .5rem;
 
-        .wrapper {
-            padding: 0;
-            margin: 0;
+        td {
+          padding: 1rem;
+          background-color: transparent;
+          color: #fff;
+          border-bottom: none;
 
-            .image {
-                margin: 0 10px 0 0;
+          &:first-of-type {
+            border-top-left-radius: .5rem;
+            border-bottom-left-radius: .5rem;
+          }
 
-                img {
-                    width: 50px;
-                    height: 50px;
-                    border-radius: .5rem;
-                }
-            }
-
-            .details {
-                flex: 1;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-wrap: nowrap;
-                gap: 1rem;
-
-                .addon-title {
-                    flex-grow: 1;
-                    align-self: center;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-
-                .addon-version {
-                    flex-shrink: 0;
-                    align-self: center;
-                }
-
-                .btn-secondary {
-                    flex-shrink: 0;
-                    margin-right: 1rem;
-
-                    &:hover {
-                        border-color: rgba(255, 255, 255, .2) !important;
-                    }
-                }
-            }
+          &:last-of-type {
+            border-top-right-radius: .5rem;
+            border-bottom-right-radius: .5rem;
+          }
         }
+      }
+    }
+  }
 
-        &:hover {
-            background-color: rgba(255, 255, 255, .1);
-
-            .details {
-                .btn-secondary {
-                    border-color: rgba(255, 255, 255, .2)
-                }
-            }
-        }
+  .searchbar-addons-installed {
+    input {
+        padding: 0 10px 0 35px;
+        height: 38px;
     }
 
-    .browse-addon-card {
-        background-color: #1f1f1f;
-        border-radius: 1rem;
-
-        .wrapper {
-            .image {
-                img {
-                    border-radius: .5rem;
-                }
-            }
-
-            .details {
-                flex-direction: column;
-            }
-        }
+    i {
+        top: 20px;
+        left: 10px;
+        transform: translateY(-50%);
     }
+  }
 
-    .nav-tabs {
-        border: none;
-        margin-bottom: 2rem;
-
-        .nav-item {
-            .nav-link {
-                color: #9a9a9a;
-                border: none;
-                border-bottom: transparent;
-
-                &:hover {
-                    color: #fff;
-                }
-            }
-
-            .nav-link.active {
-                background: transparent;
-                border: none;
-                border-bottom: 1px solid $base-color-4;
-                color: #fff;
-            }
-        }
+  .searchbar-addons-browse {
+    input {
+        padding: 0 10px 0 35px;
+        height: 38px;
     }
-
-    .banner {
-        width: 100px;
+    
+    i {
+        top: 20px;
+        left: 10px;
+        transform: translateY(-50%);
     }
+  }
 
-    .addon-search-input {
-        input {
-            background-color: #171717 !important;
-        }
-    }
 }
 
 .page-servers {
-    .server-card {
-        background-color: #191919;
-        border: none;
+  .server-card {
+    background-color: #191919;
+    border: none;
+    border-radius: 1rem;
+    padding: 1rem;
+
+    .server-card-logo {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      margin-right: 1rem;
+
+      img {
         border-radius: 1rem;
-        padding: 1rem;
+      }
 
-        .server-card-logo {
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            margin-right: 1rem;
+      .icon {
+        display: none;
+        top: 53%;
+        left: 50%;
+        transform: translate(-50%, -50%);
 
-            img {
-                border-radius: 1rem;
-            }
-
-            .icon {
-                display: none;
-                top: 53%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-
-                i {
-                    color: #afe043;
-                }
-            }
+        i {
+          color: #afe043;
         }
-
-        &:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-
-            .server-card-logo {
-                img {
-                    visibility: hidden;
-                }
-            }
-
-            .icon {
-                display: block;
-            }
-        }
+      }
     }
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+
+      .server-card-logo {
+        img {
+          visibility: hidden;
+        }
+      }
+
+      .icon {
+        display: block;
+      }
+    }
+  }
 }
 
 // React Select
 .warperia-select__control {
-    border: none !important;
-    border-radius: .375rem !important;
-    background-color: $base-color-2 !important;
+  border: none !important;
+  border-radius: 0.375rem !important;
+  background-color: $base-color-2 !important;
 
-    &:hover {
-        cursor: pointer;
-    }
+  &:hover {
+    cursor: pointer;
+  }
 }
 
 .warperia-select__value-container,
 .warperia-select__menu {
-    background-color: $base-color-2 !important;
-    border-radius: .375rem;
+  background-color: $base-color-2 !important;
+  border-radius: 0.375rem;
 }
 
 .warperia-select__indicator-separator {
-    background-color: transparent !important;
+  background-color: transparent !important;
 }
 
 .warperia-select__option--is-focused,
 .warperia-select__multi-value {
-    background-color: rgba(255, 255, 255, .1) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
 
-    &:hover {
-        cursor: pointer;
-    }
+  &:hover {
+    cursor: pointer;
+  }
 }
 
 .warperia-select__multi-value__label,
 .warperia-select__input-container,
 .warperia-select__single-value {
-    color: #fff !important;
+  color: #fff !important;
 }
 
 .warperia-select__single-value {
-    color: #808080 !important;
+  color: #808080 !important;
 }
 
 .warperia-select__indicator svg {
-    &:hover {
-        color: #fff;
-    }
+  &:hover {
+    color: #fff;
+  }
 }
 
 // Pagination
 .pagination {
-    .page-item {
-        .page-link {
-            padding: .575rem .75rem;
-            background-color: $base-color-2;
-            color: #fff;
-            border: none;
-            border-radius: 0;
+  .page-item {
+    .page-link {
+      padding: 0.575rem 0.75rem;
+      background-color: $base-color-2;
+      color: #fff;
+      border: none;
+      border-radius: 0;
 
-            &:hover,
-            &:focus,
-            &:active {
-                background-color: $base-color-3;
-                color: $base-color-4;
-                box-shadow: none;
-            }
-        }
+      &:hover,
+      &:focus,
+      &:active {
+        background-color: $base-color-3;
+        color: $base-color-4;
+        box-shadow: none;
+      }
     }
+  }
 
-    .page-item.disabled {
-        opacity: .9;
+  .page-item.disabled {
+    opacity: 0.9;
+  }
+
+  .page-item.active {
+    .page-link {
+      background-color: $base-color-4;
+      color: #fff;
+
+      &:hover {
+        opacity: 0.8;
+      }
     }
+  }
 
-    .page-item.active {
-        .page-link {
-            background-color: $base-color-4;
-            color: #fff;
+  .page-item.jump-page {
+    .form-control {
+      border: none;
+      border-radius: 0;
+      padding: 9px 0;
 
-            &:hover {
-                opacity: .8;
-            }
-        }
+      &::-webkit-inner-spin-button,
+      &::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        margin: 0;
+      }
     }
-
-    .page-item.jump-page {
-        .form-control {
-            border: none;
-            border-radius: 0;
-            padding: 9px 0;
-
-            &::-webkit-inner-spin-button,
-            &::-webkit-outer-spin-button {
-                -webkit-appearance: none;
-                -moz-appearance: none;
-                appearance: none;
-                margin: 0;
-            }
-        }
-    }
+  }
 }
 
 // Addon Context Menu
 .context-menu {
-    border: 1px solid rgba(99, 99, 99, .1);
-    max-width: 500px;
+  border: 1px solid rgba(99, 99, 99, 0.1);
+  max-width: 500px;
 
-    ul {
-        li {
-            .btn {
-                padding: .75rem !important;
-                color: rgba(255, 255, 255, .8);
+  ul {
+    li {
+      .btn {
+        padding: 0.75rem !important;
+        color: rgba(255, 255, 255, 0.8);
 
-                &:hover {
-                    background-color: rgba(255, 255, 255, 0.1);
-                    border-radius: 0;
-                    color: #fff;
-                }
-            }
-
-            .btn.btn-delete {
-                color: #ff5858;
-            }
+        &:hover {
+          background-color: rgba(255, 255, 255, 0.1);
+          border-radius: 0;
+          color: #fff;
         }
-    }
+      }
 
-    .context-menu-top {
-        border-bottom: 1px solid rgba(255, 255, 255, .1);
+      .btn.btn-delete {
+        color: #ff5858;
+      }
     }
+  }
+
+  .context-menu-top {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+    img {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+    }
+  }
 }
 
 // Sidebar Navigation
 .sidenav {
-    position: fixed;
-    width: 80px;
-    z-index: 999;
-    left: 0;
-    top: 30px;
-    background-color: $color-2;
-    border-right: 1px solid #1c1c1c;
-    height: calc(100% - 30px);
+  position: fixed;
+  width: 80px;
+  z-index: 999;
+  left: 0;
+  top: 30px;
+  background-color: $color-2;
+  border-right: 1px solid #1c1c1c;
+  height: calc(100% - 30px);
 
-    .logo {
-        max-width: 200px;
-        padding: 0 1.25rem;
-    }
+  .logo {
+    max-width: 200px;
+    padding: 0 1.25rem;
+  }
 
-    .sidebar-update-container {
-        background-color: #ffc100;
-    }
+  .sidebar-update-container {
+    background-color: #ffc100;
+  }
 
-    li {
-        width: 100%;
+  li {
+    width: 100%;
 
-        .nav-link {
-            text-align: center;
-            margin: 0 .75rem;
-            padding: .75rem 0;
-            border-radius: .75rem !important;
+    .nav-link {
+      text-align: center;
+      margin: 0 0.75rem;
+      padding: 0.75rem 0;
+      border-radius: 0.75rem !important;
 
-            &.active,
-            &:hover {
-                background-color: rgba(255, 255, 255, 0.1) !important;
-
-                svg {
-                    fill: #fff;
-                }
-            }
-        }
-
-        .nav-create-btn {
-            background-color: #afe043;
-            margin-bottom: .5rem;
-
-            &:hover {
-                background-color: #afe043 !important;
-                cursor: pointer;
-                opacity: .8;
-
-                svg {
-                    fill: #121212;
-                }
-            }
-
-            svg {
-                fill: #121212;
-            }
-        }
+      &.active,
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
 
         svg {
-            width: 100%;
-            height: 100%;
+          fill: #fff;
         }
-
-        span {
-            margin-top: 2px;
-            color: #ccc;
-        }
+      }
     }
 
-    .sidebar-icon {
-        width: 24px;
-        height: 24px;
-        fill: #ccc;
-        object-fit: cover;
+    .nav-create-btn {
+      background-color: #afe043;
+      margin-bottom: 0.5rem;
+
+      &:hover {
+        background-color: #afe043 !important;
+        cursor: pointer;
+        opacity: 0.8;
+
+        svg {
+          fill: #121212;
+        }
+      }
+
+      svg {
+        fill: #121212;
+      }
     }
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    span {
+      margin-top: 2px;
+      color: #ccc;
+    }
+  }
+
+  .sidebar-icon {
+    width: 24px;
+    height: 24px;
+    fill: #ccc;
+    object-fit: cover;
+  }
 }
 
 .update-bar {
-    margin-left: 80px;
+  margin-left: 80px;
 }
 
 // Homepage
 .homepage {
-    .welcome-title {
-        .text-gradient {
-            background: linear-gradient(90deg, #0f93ff, #abd9ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-fill-color: transparent;
-        }
+  .welcome-title {
+    .text-gradient {
+      background: linear-gradient(90deg, #0f93ff, #abd9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-fill-color: transparent;
+    }
+  }
+
+  .card-server {
+    background-color: #1f1f1f;
+
+    img {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+      margin-right: 10px;
     }
 
-    .card-server {
-        background-color: #1f1f1f;
+    .server-content {
+      .card-title {
+        font-size: 18px;
+      }
 
-        img {
-            width: 100px;
-            height: 100px;
-            object-fit: cover;
-            margin-right: 10px;
+      .card-text {
+        p {
+          margin-bottom: 0;
         }
-
-        .server-content {
-            .card-title {
-                font-size: 18px;
-            }
-
-            .card-text {
-                p {
-                    margin-bottom: 0;
-                }
-            }
-        }
-
-        &:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
+      }
     }
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+  }
 }
 
 .server-page {
-    .server-info {
-        background-color: $color-2;
-        border-radius: 1rem !important;
+  .server-info {
+    background-color: $color-2;
+    border-radius: 1rem !important;
 
-        .btn-restart {
-            background-color: #313131;
-        }
-
-        .nav-pills {
-            .nav-item {
-                width: 100%;
-
-                button {
-                    width: 100%;
-                    text-align: left;
-                    font-weight: 500;
-                    color: #ccc;
-
-                    &:hover {
-                        background-color: rgba(255, 255, 255, .1);
-                        color: #fff;
-                    }
-
-                    i {
-                        margin-top: 2px;
-                    }
-                }
-
-                button.active {
-                    background-color: rgba(255, 255, 255, .1);
-                    color: #fff;
-                }
-            }
-        }
+    .btn-restart {
+      background-color: #313131;
     }
+
+    .nav-pills {
+      .nav-item {
+        width: 100%;
+
+        button {
+          width: 100%;
+          text-align: left;
+          font-weight: 500;
+          color: #ccc;
+
+          &:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #fff;
+          }
+
+          i {
+            margin-top: 2px;
+          }
+        }
+
+        button.active {
+          background-color: rgba(255, 255, 255, 0.1);
+          color: #fff;
+        }
+      }
+    }
+  }
 }
 
 // Custom Scrolling and Selection
 ::-webkit-scrollbar {
-    width: 7px;
+  width: 7px;
 }
 
 ::-webkit-scrollbar-track {
-    background: $base-color-1;
+  background: $base-color-1;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: $base-color-3;
+  background: $base-color-3;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: $base-color-4;
+  background: $base-color-4;
 }

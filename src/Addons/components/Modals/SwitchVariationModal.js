@@ -25,7 +25,7 @@ const SwitchVariationModal = ({ show, onHide, availableVariations, onSwitchVaria
       {show && <div className="modal-overlay"></div>}
       <div className={`modal fade ${show ? 'show d-block' : ''}`} tabIndex="-1" role="dialog" style={{ display: show ? 'block' : 'none' }}>
         <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl modal-dark modal-switch-variations modal-fixed-height">
-          <div className="modal-content rounded-0">
+          <div className="modal-content">
             <div className="modal-header">
               <h5 className="modal-title">Switch Addon Variation</h5>
               <button type="button" className="btn-close btn-close-white" aria-label="Close" onClick={onHide}></button>
@@ -66,7 +66,7 @@ const SwitchVariationModal = ({ show, onHide, availableVariations, onSwitchVaria
                             <span className="text-success"><i className="bi bi-check-circle-fill me-1"></i> Activated</span>
                           ) : (
                             <button
-                              className="btn btn-outline-secondary-2 rounded-0"
+                              className="btn btn-outline-secondary-2"
                               onClick={() => handleSwitch(variation)}
                               disabled={!!loadingVariationId}
                             >

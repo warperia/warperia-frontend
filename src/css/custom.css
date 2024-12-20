@@ -86,13 +86,14 @@ a:hover, a:focus {
 }
 
 .btn-primary {
-  background-color: rgba(67, 113, 224, 0.5);
+  background-color: #4371e0;
   color: #fff;
-  border: 1px solid rgba(67, 113, 224, 0.5);
+  border: 1px solid #4371e0;
   font-weight: 500;
 }
 .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
-  background-color: rgba(67, 113, 224, 0.7);
+  background-color: #4e82ff;
+  border-color: #4e82ff;
   color: #fff;
   box-shadow: none;
 }
@@ -754,6 +755,56 @@ a:hover, a:focus {
 .page-addons .addon-search-input input {
   background-color: #171717 !important;
 }
+.page-addons .table-addons-installed {
+  border-collapse: separate;
+  border-spacing: 0 0.5rem;
+}
+.page-addons .table-addons-installed thead {
+  background-color: transparent;
+}
+.page-addons .table-addons-installed thead tr th {
+  background-color: transparent;
+  color: #fff;
+  border-bottom: none;
+  padding: 1rem 0 0 1rem;
+}
+.page-addons .table-addons-installed tbody tr {
+  background-color: #191919;
+  border: none;
+  border-radius: 1rem;
+}
+.page-addons .table-addons-installed tbody tr td {
+  padding: 1rem;
+  background-color: transparent;
+  color: #fff;
+  border-bottom: none;
+}
+.page-addons .table-addons-installed tbody tr td:first-of-type {
+  border-top-left-radius: 0.5rem;
+  border-bottom-left-radius: 0.5rem;
+}
+.page-addons .table-addons-installed tbody tr td:last-of-type {
+  border-top-right-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}
+.page-addons .searchbar-addons-installed input {
+  padding: 0 10px 0 35px;
+  height: 38px;
+}
+.page-addons .searchbar-addons-installed i {
+  top: 20px;
+  left: 10px;
+  transform: translateY(-50%);
+}
+.page-addons .searchbar-addons-browse input {
+  padding: 0 10px 0 35px;
+  height: 38px;
+}
+.page-addons .searchbar-addons-browse i {
+  top: 20px;
+  left: 10px;
+  transform: translateY(-50%);
+}
 
 .page-servers .server-card {
   background-color: #191919;
@@ -885,6 +936,12 @@ a:hover, a:focus {
 }
 .context-menu .context-menu-top {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.context-menu .context-menu-top img {
+  width: 40px;
+  height: 40px;
+  -o-object-fit: cover;
+     object-fit: cover;
 }
 
 .sidenav {
