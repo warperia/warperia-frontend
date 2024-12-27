@@ -20,28 +20,12 @@ const App = () => {
 
   // Update state
   const [isUpdating, setIsUpdating] = useState(false);
-  const [latestVersion, setLatestVersion] = useState("");
-  const [updateUrl, setUpdateUrl] = useState("");
-  const [appVersion, setAppVersion] = useState("");
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [updateDownloaded, setUpdateDownloaded] = useState(false);
 
   const setPage = (page) => {
     setCurrentPage(page);
   };
-
-  useEffect(() => {
-    const fetchAppVersion = window.electron.ipcRenderer.invoke("get-app-version");
-    const fetchSettings = fetch(`${WEB_URL}/wp-json/wp/v2/site-settings`).then((res) => res.json());
-
-    Promise.all([fetchAppVersion, fetchSettings])
-      .then(([versionResult, settingsData]) => {
-        setAppVersion(versionResult.version);
-        setLatestVersion(settingsData.app_version);
-        setUpdateUrl(settingsData.app_file);
-      })
-      .catch((error) => {
-        console.error("Error fetching data:", error);
-      });
-  }, []);
 
   useEffect(() => {
     const initializeUser = async () => {
@@ -78,6 +62,34 @@ const App = () => {
     await window.electron.clearUser();
   };
 
+  useEffect(() => {
+
+    window.electron.onUpdateAvailable((info) => {
+      setIsUpdating(true);
+    });
+
+    window.electron.onUpdateProgress((progress) => {
+      setDownloadProgress(progress);
+    });
+
+    window.electron.onUpdateDownloaded((info) => {
+      setDownloadProgress(100);
+      setUpdateDownloaded(true);
+      setIsUpdating(false);
+      setToastMessage(`Update v${info.version} downloaded and will be installed on restart.`);
+      setToastType('success');
+    });
+
+    window.electron.onUpdateError((error) => {
+      setIsUpdating(false);
+      setToastMessage(`Update failed: ${error}`);
+      setToastType('danger');
+    });
+
+    return () => {
+    };
+  }, []);
+
   return (
     <Router>
       <div className="h-100">
@@ -112,7 +124,7 @@ const App = () => {
             </div>
           </div>
         ) : (
-          // Main content when the app is not updating
+          // Main content
           <Routes>
             <Route
               path="/login"
@@ -145,6 +157,42 @@ const App = () => {
             />
           </Routes>
         )}
+
+        {/* Download Progress Overlay */}
+        {isUpdating && (
+          <div className="update-progress position-fixed top-0 left-0 w-100 h-100 d-flex justify-content-center align-items-center bg-dark bg-opacity-50">
+            <div className="text-center text-white">
+              <div className="spinner-border" role="status">
+                <span className="visually-hidden">Downloading update...</span>
+              </div>
+              <div className="mt-3">Downloading update for Warperia...</div>
+              <div className="progress rounded-0 mt-3">
+                <div
+                  className="progress-bar"
+                  role="progressbar"
+                  style={{ width: `${downloadProgress}%` }}
+                  aria-valuenow={downloadProgress}
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                >
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {updateDownloaded && (
+          <div className="update-bar position-fixed bottom-0 start-0 end-0 bg-dark text-white p-3 d-flex justify-content-between align-items-center">
+            <span className="fw-bolder">A new update has been downloaded for Warperia</span>
+            <button
+              className="btn btn-primary fw-bold"
+              onClick={() => autoUpdater.quitAndInstall(false, true)}
+            >
+              Install Update
+            </button>
+          </div>
+        )}
+        
         {toastMessage && (
           <div className="toast-container position-fixed bottom-0 end-0 p-3" style={{ zIndex: 11 }}>
             <div className={`toast show text-bg-${toastType}`} role="alert" aria-live="assertive" aria-atomic="true">
@@ -162,20 +210,6 @@ const App = () => {
               </div>
               <div className="toast-body">{toastMessage}</div>
             </div>
-          </div>
-        )}
-        {/* Update Bar */}
-        {latestVersion && appVersion && appVersion !== latestVersion && !isUpdating && (
-          <div className="update-bar position-fixed bottom-0 start-0 end-0 bg-dark text-white p-3 d-flex justify-content-between align-items-center">
-            <span className="fw-bolder">A new update is available for Warperia</span>
-            <a
-              href={updateUrl || "#"}
-              className="btn btn-primary fw-bold"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Download Update
-            </a>
           </div>
         )}
       </div>

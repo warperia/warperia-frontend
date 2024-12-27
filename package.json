@@ -1,6 +1,6 @@
 {
   "name": "warperia",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "World of Warcraft Private Servers Addon Manager application",
   "main": "src/main.cjs",
   "scripts": {
@@ -33,8 +33,9 @@
     ],
     "publish": [
       {
-        "provider": "generic",
-        "url": "https://warperia.com/wp-content/themes/warperia-com/updates"
+        "provider": "github",
+        "owner": "warperia",
+        "repo": "warperia-frontend"
       }
     ],
     "win": {
@@ -92,9 +93,11 @@
     "bootstrap-icons": "^1.11.3",
     "browserify-zlib": "^0.2.0",
     "buffer": "^6.0.3",
+    "chart.js": "^4.4.7",
     "crypto-browserify": "^3.12.0",
     "electron-dl": "^4.0.0",
     "electron-is-dev": "^3.0.1",
+    "electron-log": "^5.2.4",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.0",
     "electron-updater": "^6.3.9",
@@ -110,6 +113,7 @@
     "process": "^0.11.10",
     "ps-list": "^8.1.1",
     "react": "^18.3.1",
+    "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
     "react-select": "^5.8.0",

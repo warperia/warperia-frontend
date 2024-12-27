@@ -431,6 +431,13 @@ a:hover, a:focus {
   border-radius: 1rem;
 }
 
+.modal-sessions .card {
+  border-radius: 0.5rem;
+  background-color: #121212;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
 .lightbox-overlay {
   position: fixed;
   top: 0;
@@ -725,11 +732,34 @@ a:hover, a:focus {
   background-color: #1f1f1f;
   border-radius: 1rem;
 }
-.page-addons .browse-addon-card .wrapper .image img {
+.page-addons .browse-addon-card .wrapper .left .image img {
   border-radius: 0.5rem;
 }
-.page-addons .browse-addon-card .wrapper .details {
+.page-addons .browse-addon-card .wrapper .left .details {
   flex-direction: column;
+}
+.page-addons .browse-addon-card .wrapper .left .center-part {
+  width: 70%;
+  margin-right: 1rem;
+}
+.page-addons .browse-addon-card .wrapper .right .buttons {
+  width: 30%;
+}
+.page-addons .browse-addon-card .wrapper .right .buttons button {
+  float: right;
+}
+.page-addons .browse-addon-card .wrapper .right .buttons .btn-installed {
+  pointer-events: none;
+}
+.page-addons .browse-addon-card .wrapper .right .buttons .btn-installed:disabled {
+  color: #00cd6e;
+  border: none;
+}
+.page-addons .browse-addon-card .wrapper .progress-bar {
+  background-color: #4371e0;
+}
+.page-addons .browse-addon-card:hover {
+  background-color: #232323;
 }
 .page-addons .nav-tabs {
   border: none;
@@ -786,6 +816,13 @@ a:hover, a:focus {
 .page-addons .table-addons-installed tbody tr td:last-of-type {
   border-top-right-radius: 0.5rem;
   border-bottom-right-radius: 0.5rem;
+}
+.page-addons .table-addons-installed tbody tr:hover {
+  background-color: #232323;
+}
+.page-addons .sticky-controls {
+  background-color: #0d0c0c;
+  padding-bottom: 1rem;
 }
 .page-addons .searchbar-addons-installed input {
   padding: 0 10px 0 35px;

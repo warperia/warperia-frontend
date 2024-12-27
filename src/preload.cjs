@@ -5,13 +5,15 @@ try {
   const crypto = require('crypto');
   const versionInfo = require('win-version-info');
   const extract = require('extract-zip');
-  const { spawn } = require('child_process');
-  const { exec } = require('child_process');
+  const { spawn, exec } = require('child_process');
   const processManager = new Map();
   const os = require('os');
 
   contextBridge.exposeInMainWorld('electron', {
 
+    // --------------------------------
+    // KEY IPC RENDERER WRAPPERS
+    // --------------------------------
     ipcRenderer: {
       send: (channel, data) => ipcRenderer.send(channel, data),
       invoke: (channel, data) => ipcRenderer.invoke(channel, data),
@@ -19,17 +21,25 @@ try {
       removeListener: (channel, func) => ipcRenderer.removeListener(channel, func),
     },
 
+    // --------------------------------
+    // PATH HELPERS
+    // --------------------------------
     pathJoin: (...args) => path.join(...args),
     pathResolve: (...args) => path.resolve(...args),
     pathNormalize: (p) => path.normalize(p),
     pathRelative: (from, to) => path.relative(from, to),
     pathIsAbsolute: (p) => path.isAbsolute(p),
 
-    // App Updates (not working, needs attention at some point)
+    // --------------------------------
+    // USER DATA PATH
+    // --------------------------------
     getUserDataPath: () => {
       return ipcRenderer.sendSync('get-user-data-path');
     },
 
+    // --------------------------------
+    // DOWNLOAD FILES
+    // --------------------------------
     downloadFile: async (url, savePath) => {
       return new Promise((resolve, reject) => {
         const fs = require('fs');
@@ -68,89 +78,91 @@ try {
       });
     },
 
-    // Expose the function to restart and install the app
+    // --------------------------------
+    // APP UPDATES
+    // --------------------------------
     installUpdate: () => {
       ipcRenderer.invoke("install-update");
     },
 
+    // Listen for auto-updater events
+    onUpdateChecking: (callback) => {
+      ipcRenderer.on('update-checking', () => callback());
+    },
+    onUpdateAvailable: (callback) => {
+      ipcRenderer.on('update-available', (event, info) => callback(info));
+    },
+    onUpdateNotAvailable: (callback) => {
+      ipcRenderer.on('update-not-available', (event, info) => callback(info));
+    },
+    onUpdateProgress: (callback) => {
+      ipcRenderer.on('update-progress', (event, progress) => callback(progress));
+    },
+    onUpdateDownloaded: (callback) => {
+      ipcRenderer.on('update-downloaded', (event, info) => callback(info));
+    },
+    onUpdateError: (callback) => {
+      ipcRenderer.on('update-error', (event, error) => callback(error));
+    },
+
+    // --------------------------------
+    // FILE DIALOG
+    // --------------------------------
     showOpenDialog: (options) => ipcRenderer.invoke('show-open-dialog', options),
 
+    // --------------------------------
+    // STORE / RETRIEVE TOKEN
+    // --------------------------------
     storeToken: (token) => ipcRenderer.invoke('store-token', token),
     retrieveToken: () => ipcRenderer.invoke('retrieve-token'),
     clearToken: () => ipcRenderer.invoke('clear-token'),
 
+    // --------------------------------
+    // STORE / RETRIEVE USER
+    // --------------------------------
     storeUser: (user) => ipcRenderer.invoke('store-user', user),
     retrieveUser: () => ipcRenderer.invoke('retrieve-user'),
     clearUser: () => ipcRenderer.invoke('clear-user'),
 
-    // Launch an executable
+    // --------------------------------
+    // LAUNCH / TERMINATE EXE
+    // --------------------------------
     launchExe: (exePath) => {
+      const { spawn, execSync } = require('child_process');
+      const fs = require('fs');
       if (!fs.existsSync(exePath)) {
         throw new Error('Executable file not found.');
       }
-
-      if (processManager.has(exePath)) {
-        throw new Error('The process is already running.');
-      }
-
+      // Just spawn the user-typed exe
       const processInstance = spawn(exePath, [], {
         detached: true,
-        stdio: 'ignore',
+        stdio: 'ignore'
       });
-
       processInstance.unref();
-      processManager.set(exePath, processInstance.pid);
-
-      // Emit status when the process starts
-      ipcRenderer.send('process-status-update', { exePath, running: true });
-
-      // Listen for process exit or error events
-      processInstance.on('exit', (code) => {
-        console.log(`Process exited: ${exePath}, code: ${code}`);
-        processManager.delete(exePath);
-        ipcRenderer.send('process-status-update', { exePath, running: false });
-      });
-
-      processInstance.on('error', (error) => {
-        console.error(`Process error: ${exePath}, error: ${error.message}`);
-        processManager.delete(exePath);
-        ipcRenderer.send('process-status-update', { exePath, running: false });
-      });
-
-      return processInstance.pid;
     },
 
-    // Check if a process is running
-    isProcessRunning: (exePath) => {
-      const pid = processManager.get(exePath);
-      if (!pid) return false;
-
-      try {
-        process.kill(pid, 0); // Check if the process is alive
-        return true;
-      } catch {
-        processManager.delete(exePath); // Cleanup if the process is not running
-        return false;
-      }
+    // For truly restarting:
+    restartExe: async (exePath) => {
+      // We'll rely on main to do the fallback kill logic, 
+      // then re-launch the original exe
+      return ipcRenderer.invoke('restart-exe', exePath);
     },
 
-    // Terminate a process
-    terminateProcess: (exePath) => {
-      const pid = processManager.get(exePath);
-      if (!pid) {
-        throw new Error('No process found to terminate.');
-      }
-
-      try {
-        process.kill(pid);
-        processManager.delete(exePath);
-        ipcRenderer.send('process-status-update', { exePath, running: false });
-        return true;
-      } catch (error) {
-        throw new Error(`Failed to terminate process: ${error.message}`);
-      }
+    // --------------------------------
+    // START/STOP PROCESS MONITORING
+    // (This triggers repeated checks in main.cjs)
+    // --------------------------------
+    startProcessMonitoring: (exePath, serverId, intervalMs = 5000) => {
+      ipcRenderer.send('start-process-monitoring', { exePath, serverId, intervalMs });
+    },
+    stopProcessMonitoring: (exePath) => {
+      ipcRenderer.send('stop-process-monitoring', { exePath });
     },
 
+
+    // --------------------------------
+    // CHECK WOW VERSION
+    // --------------------------------
     checkWowVersion: (filePath) => {
       try {
         const fileName = path.basename(filePath);
@@ -188,6 +200,9 @@ try {
       }
     },
 
+    // --------------------------------
+    // ZIP / FILE IO UTILS
+    // --------------------------------
     saveZipFile: async (zipBlob, fileName) => {
       try {
         const userDataPath = ipcRenderer.sendSync('get-user-data-path');
@@ -234,7 +249,7 @@ try {
         console.error(`Error overwriting file: ${filePath}`, err);
         throw err;
       }
-    },    
+    },
 
     createFolder: async (folderPath) => {
       try {

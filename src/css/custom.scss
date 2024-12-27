@@ -525,6 +525,15 @@ a {
   }
 }
 
+.modal-sessions {
+  .card {
+    border-radius: 0.5rem;
+    background-color: #121212;
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
+  }
+}
+
 // Custom Lightbox
 .lightbox-overlay {
   position: fixed;
@@ -895,15 +904,49 @@ a {
     border-radius: 1rem;
 
     .wrapper {
-      .image {
-        img {
-          border-radius: 0.5rem;
+      .left {
+        .image {
+          img {
+            border-radius: 0.5rem;
+          }
+        }
+
+        .details {
+          flex-direction: column;
+        }
+
+        .center-part {
+          width: 70%;
+          margin-right: 1rem;
         }
       }
 
-      .details {
-        flex-direction: column;
+      .right {
+        .buttons {
+          width: 30%;
+
+          button {
+            float: right;
+          }
+
+          .btn-installed {
+            pointer-events: none;
+
+            &:disabled {
+              color: #00cd6e;
+              border: none;
+            }
+          }
+        }
       }
+
+      .progress-bar {
+        background-color: $base-color-4;
+      }
+    }
+
+    &:hover {
+      background-color: #232323;
     }
   }
 
@@ -943,7 +986,7 @@ a {
 
   .table-addons-installed {
     border-collapse: separate;
-    border-spacing: 0 .5rem;
+    border-spacing: 0 0.5rem;
 
     thead {
       background-color: transparent;
@@ -971,45 +1014,53 @@ a {
           border-bottom: none;
 
           &:first-of-type {
-            border-top-left-radius: .5rem;
-            border-bottom-left-radius: .5rem;
+            border-top-left-radius: 0.5rem;
+            border-bottom-left-radius: 0.5rem;
           }
 
           &:last-of-type {
-            border-top-right-radius: .5rem;
-            border-bottom-right-radius: .5rem;
+            border-top-right-radius: 0.5rem;
+            border-bottom-right-radius: 0.5rem;
           }
+        }
+
+        &:hover {
+          background-color: #232323;
         }
       }
     }
   }
 
+  .sticky-controls {
+    background-color: $color-1;
+    padding-bottom: 1rem;
+  }
+
   .searchbar-addons-installed {
     input {
-        padding: 0 10px 0 35px;
-        height: 38px;
+      padding: 0 10px 0 35px;
+      height: 38px;
     }
 
     i {
-        top: 20px;
-        left: 10px;
-        transform: translateY(-50%);
+      top: 20px;
+      left: 10px;
+      transform: translateY(-50%);
     }
   }
 
   .searchbar-addons-browse {
     input {
-        padding: 0 10px 0 35px;
-        height: 38px;
+      padding: 0 10px 0 35px;
+      height: 38px;
     }
-    
+
     i {
-        top: 20px;
-        left: 10px;
-        transform: translateY(-50%);
+      top: 20px;
+      left: 10px;
+      transform: translateY(-50%);
     }
   }
-
 }
 
 .page-servers {

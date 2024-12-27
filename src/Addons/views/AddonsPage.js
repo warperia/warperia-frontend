@@ -56,7 +56,6 @@ const AddonsPage = ({
     const [initialLoading, setInitialLoading] = useState(true);
     const [scanningAddons, setScanningAddons] = useState(false);
     const [downloading, setDownloading] = useState(false);
-    const [progress, setProgress] = useState(0);
     const [installingAddonId, setInstallingAddonId] = useState(null);
     const [installedAddons, setInstalledAddons] = useState({});
     const [corruptedAddons, setCorruptedAddons] = useState({});
@@ -126,6 +125,11 @@ const AddonsPage = ({
         { value: "recently_added", label: "Recently Added" },
         { value: "recently_updated", label: "Recently Updated" },
     ];
+
+    // Addon Installation Progress
+    const [installingAddonStep, setInstallingAddonStep] = useState(null);
+    const [progress, setProgress] = useState(0);
+
 
     // Utility function to check if a path is inside a directory
     const isPathInsideDirectory = (childPath, parentPath) => {
@@ -371,7 +375,11 @@ const AddonsPage = ({
 
         const authorName = isAuthorCreator && authorData
             ? authorData.display_name
-            : creatorName || "Unknown";
+            : creatorName || "N/A";
+
+        if (hideImage && (authorName === "Unknown" || authorName === "N/A")) {
+            return <span>Unknown author</span>;
+        }
 
         if (hideImage) {
             return <span>{authorName}</span>;
@@ -564,6 +572,7 @@ const AddonsPage = ({
         try {
             setDownloading(true);
             setInstallingAddonId(addon.id);
+            setInstallingAddonStep("Deleting previous folders");
 
             // Step 1: Handle Variations
             let relatedAddons = [];
@@ -624,6 +633,7 @@ const AddonsPage = ({
                                 let deleteSuccess = false;
                                 for (let attempt = 0; attempt < 2; attempt++) {
                                     await window.electron.deleteFolder(folderPath);
+                                    setInstallingAddonStep(`Deleting old folders`);
 
                                     // Check if the folder still exists using fileExists
                                     if (!(await window.electron.fileExists(folderPath))) {
@@ -652,6 +662,7 @@ const AddonsPage = ({
             );
 
             // Step 3: Download and extract the new addon
+            setInstallingAddonStep("Downloading addon...");
             const response = await axios.get(addonUrl, {
                 responseType: "blob",
                 onDownloadProgress: (progressEvent) => {
@@ -1017,6 +1028,7 @@ const AddonsPage = ({
                 response.data,
                 fileName
             );
+            setInstallingAddonStep("Extracting files");
             await window.electron.extractZip(zipFilePath, installPath);
 
             // Write the .warperia file to indicate the addon is installed
@@ -1032,6 +1044,7 @@ const AddonsPage = ({
                     .map(([folderName]) => folderName)
                     .join(",")}`
             );
+            setInstallingAddonStep("Finalizing installation");
 
             // Update the UI to reflect the installed addon
             const updatedAddons = { ...installedAddons };
@@ -1062,6 +1075,7 @@ const AddonsPage = ({
                 setDownloading(false);
                 setProgress(0);
                 setInstallingAddonId(null);
+                setInstallingAddonStep(null);
             }, 1500);
         }
     };
@@ -1692,7 +1706,7 @@ const AddonsPage = ({
         // For browse addons, unchanged
         return (
             <div
-                className={`row ${activeTab === "myAddons" ? "g-4" : "g-3 row-cols-md-2 row-cols-xl-2"
+                className={`row ${activeTab === "myAddons" ? "g-4" : "g-3 row-cols-md-1 row-cols-xl-1"
                     }`}
             >
                 {finalAddons.map((addon) => {
@@ -1707,6 +1721,8 @@ const AddonsPage = ({
                             installedAddon={installedAddon}
                             downloading={downloading}
                             installingAddonId={installingAddonId}
+                            installingAddonStep={installingAddonStep}
+                            progress={progress}
                             handleInstallAddon={handleInstallAddon}
                             handleUpdateAddon={handleUpdateAddon}
                             handleRightClick={handleRightClick}
@@ -1742,7 +1758,7 @@ const AddonsPage = ({
                         role="tabpanel"
                         aria-labelledby="my-addons-tab"
                     >
-                        <div className="d-flex mb-3">
+                        <div className="d-flex mb-3 sticky-top sticky-controls">
                             <div className="w-100 d-flex flex-wrap align-items-center gap-2">
                                 <Tippy content="Update all addons" placement="auto">
                                     <span>
@@ -1875,7 +1891,7 @@ const AddonsPage = ({
                         role="tabpanel"
                         aria-labelledby="browse-addons-tab"
                     >
-                        <div className="row justify-content-between gy-2 mb-4">
+                        <div className="row justify-content-between gy-2 mb-4 sticky-top sticky-controls">
                             <div className="col-12 col-md-8">
                                 <div className="searchbar-addons-browse position-relative">
                                     <input

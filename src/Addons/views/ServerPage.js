@@ -7,6 +7,7 @@ import { WEB_URL } from '../../config.js';
 
 const AddonsPage = lazy(() => import('./AddonsPage.js'));
 const EditServerModal = lazy(() => import('./../../components/modals/EditServerModal.js'));
+const SessionModal = lazy(() => import('./../components/Modals/SessionModal.js'));
 
 const knownLocales = [
     "enUS", "enGB", "deDE", "frFR", "esES", "ruRU", "zhCN", "zhTW", "koKR",
@@ -22,11 +23,18 @@ const ServerPage = ({ user }) => {
     const [serverNotFound, setServerNotFound] = useState(false);
     const [fetchTrigger, setFetchTrigger] = useState(0);
 
+    // Gaming Sessions
+    const [showSessionModal, setShowSessionModal] = useState(false);
+    const [singleSession, setSingleSession] = useState(null);
+    const [allSessions, setAllSessions] = useState([]);
+
     const expansion = server?.s_version || 'Unknown Expansion';
 
     const handleEditServer = () => setShowEditModal(true);
 
-    // Extracted fetch logic into its own function
+    // -------------------------------------------
+    // FETCH SERVER DATA
+    // -------------------------------------------
     const fetchServerData = async () => {
         try {
             const tokenResult = await window.electron.retrieveToken();
@@ -76,20 +84,53 @@ const ServerPage = ({ user }) => {
         }
     }, [user, serverId, fetchTrigger]);
 
+    // -------------------------------------------
+    // START MONITORING THE EXE WHEN SERVER LOADED
+    // -------------------------------------------
     useEffect(() => {
-        const handleProcessStatusUpdate = ({ exePath, running }) => {
-            if (server?.s_path === exePath) {
-                setIsRunning(running);
+        if (!server?.s_path) return;
+
+        // We’ll ask main to start OS-level monitoring for this exe
+        window.electron.startProcessMonitoring(server.s_path, serverId, 3000);
+
+        // Cleanup: if user switches pages, we can stop monitoring
+        return () => {
+            window.electron.stopProcessMonitoring(server.s_path);
+        };
+    }, [server?.s_path, serverId]);
+
+    // -------------------------------------------
+    // HANDLE PROCESS STATUS UPDATES
+    // -------------------------------------------
+    useEffect(() => {
+        const handleProcessStatusUpdate = (status) => {
+            if (!server) return;
+            if (status.exePath === server.s_path && status.serverId === serverId) {
+                setIsRunning(status.running);
             }
         };
-
         window.electron.ipcRenderer.on('process-status-update', handleProcessStatusUpdate);
+
+        // Listen for session-ended
+        const handleSessionEnded = ({ exePath, serverId: sId, session }) => {
+            if (exePath === server?.s_path && sId === serverId) {
+                // Show session modal with that session
+                setSingleSession(session);
+                setAllSessions([]);
+                setShowSessionModal(true);
+            }
+        };
+        window.electron.ipcRenderer.on('session-ended', handleSessionEnded);
 
         return () => {
             window.electron.ipcRenderer.removeListener('process-status-update', handleProcessStatusUpdate);
+            window.electron.ipcRenderer.removeListener('session-ended', handleSessionEnded);
         };
-    }, [server]);
+    }, [server, serverId]);
 
+    // -------------------------------------------
+    // LAUNCH / RESTART
+    // -------------------------------------------
     const handleLaunch = async () => {
         if (!server?.s_path) return;
         try {
@@ -102,13 +143,17 @@ const ServerPage = ({ user }) => {
     const handleRestart = async () => {
         if (!server?.s_path) return;
         try {
-            await window.electron.terminateProcess(server.s_path);
-            await window.electron.launchExe(server.s_path);
+            const result = await window.electron.restartExe(server.s_path);
+            //   console.log('Restart result:', result);
         } catch (error) {
             console.error('Error restarting executable:', error);
         }
     };
 
+
+    // -------------------------------------------
+    // OPEN DIRECTORY
+    // -------------------------------------------
     const handleOpenDirectory = (directoryPath) => {
         if (!directoryPath) {
             return;
@@ -122,7 +167,9 @@ const ServerPage = ({ user }) => {
         }
     };
 
-    // Detect realmlist after server data is fetched and we have s_path and s_version
+    // -------------------------------------------
+    // DETECT REALMLIST
+    // -------------------------------------------
     useEffect(() => {
         const detectRealmlist = async () => {
             if (!server?.s_path || !server?.s_version) return;
@@ -161,6 +208,15 @@ const ServerPage = ({ user }) => {
 
                 const finalRealmlist = realmlistValue || configRealmlistValue || "";
                 setServerRealmlist(finalRealmlist);
+
+                // Send the realmlist to the main process
+                if (finalRealmlist && server?.s_path) {
+                    window.electron.ipcRenderer.send('update-realmlist', {
+                        exePath: server.s_path,
+                        realmlist: finalRealmlist
+                    });
+                }
+
             } catch (err) {
                 console.error("Error detecting realmlist on ServerPage:", err);
             }
@@ -192,6 +248,39 @@ const ServerPage = ({ user }) => {
             }
         }
         return "";
+    };
+
+    // View Gaming Sessions
+    const handleViewSessions = async () => {
+        if (!server?.s_path) return;
+        try {
+            const sessions = await window.electron.ipcRenderer.invoke('load-sessions', server.s_path);
+            setSingleSession(null); // we are not focusing on a single session now
+            setAllSessions(sessions);
+            setShowSessionModal(true);
+        } catch (err) {
+            console.error('Error loading sessions:', err);
+        }
+    };
+
+    const handleDeleteSession = async (index) => {
+        if (!server?.s_path) return;
+        try {
+            const updated = await window.electron.ipcRenderer.invoke('delete-session', { exePath: server.s_path, index });
+            setAllSessions(updated);
+        } catch (err) {
+            console.error('Error deleting session:', err);
+        }
+    };
+
+    const handleClearAllSessions = async () => {
+        if (!server?.s_path) return;
+        try {
+            await window.electron.ipcRenderer.invoke('clear-sessions', server.s_path);
+            setAllSessions([]);
+        } catch (err) {
+            console.error('Error clearing sessions:', err);
+        }
     };
 
     if (serverNotFound) {
@@ -248,13 +337,14 @@ const ServerPage = ({ user }) => {
                                             )}
                                         </div>
                                     </div>
-                                    <div className="d-flex align-items-center flex-wrap gap-2">
+                                    <div className="d-flex align-items-center gap-2">
                                         <button
                                             className="btn btn-primary"
                                             onClick={handleLaunch}
                                             disabled={isRunning}
                                         >
-                                            <i className="bi bi-play-fill"></i> {isRunning ? 'Running' : 'Launch'}
+                                            <i className="bi bi-play-fill"></i>
+                                            {isRunning ? ' Running' : ' Launch'}
                                         </button>
                                         <button
                                             className="btn btn-secondary btn-restart"
@@ -265,7 +355,7 @@ const ServerPage = ({ user }) => {
                                         </button>
                                         <Tippy content="Open server directory" placement="top" className="custom-tooltip">
                                             <button
-                                                className="ms-auto btn btn-link"
+                                                className="ms-auto btn btn-secondary-2"
                                                 onClick={() => handleOpenDirectory(server.s_dir)}
                                             >
                                                 <i className="bi bi-folder-symlink vertical-fix"></i>
@@ -288,6 +378,14 @@ const ServerPage = ({ user }) => {
                                                     onClick={() => setActiveTab('browseAddons')}
                                                 >
                                                     <i className="bi bi-search me-2"></i> <span>Browse Addons</span>
+                                                </button>
+                                            </li>
+                                            <li className="nav-item">
+                                                <button
+                                                    className="nav-link"
+                                                    onClick={handleViewSessions}
+                                                >
+                                                    <i className="bi bi-clock-history me-2"></i> <span>View Sessions</span>
                                                 </button>
                                             </li>
                                             <li className="nav-item">
@@ -331,6 +429,19 @@ const ServerPage = ({ user }) => {
                     />
                 </Suspense>
             )}
+            <SessionModal
+                show={showSessionModal}
+                onClose={() => {
+                    setShowSessionModal(false);
+                    setSingleSession(null);
+                    setAllSessions([]);
+                }}
+                exePath={server.s_path}
+                singleSession={singleSession}
+                allSessions={allSessions}
+                onDeleteSession={handleDeleteSession}
+                onClearAllSessions={handleClearAllSessions}
+            />
         </div>
     );
 };
