@@ -42,7 +42,7 @@ $ npm run dev
 
 ## Download
 
-You can [download](https://warperia.com) the latest installable version of Warperia for Windows from our official website.
+You can [download](https://warperia.com) the latest installable version of Warperia for Windows from our official website or the releases section in our [GitHub repo](https://warperia.com).
 
 
 ## Minimum system requirements
