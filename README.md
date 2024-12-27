@@ -45,6 +45,13 @@ $ npm run dev
 You can [download](https://warperia.com) the latest installable version of Warperia for Windows from our official website.
 
 
+## Minimum system requirements
+
+* Intel Pentium 4
+* Windows 10
+* 512 MB of RAM
+
+
 ## Credits
 
 This software uses the following open-source packages:
