@@ -11,7 +11,7 @@ body {
   margin: 0;
   background-color: #0d0c0c;
   color: #fff;
-  font-family: "Fustat", sans-serif;
+  font-family: "Inter", sans-serif;
   text-rendering: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -284,7 +284,7 @@ a:hover, a:focus {
   font-size: 14px;
 }
 .modal-dark .modal-content .addon-content {
-  color: rgba(255, 255, 255, 0.9);
+  color: #e5e5e5;
 }
 .modal-dark .modal-content .addon-content .content {
   margin: 0;
@@ -294,8 +294,47 @@ a:hover, a:focus {
   background-color: rgba(255, 255, 255, 0.1);
   padding: 0.5rem;
 }
+.modal-dark .modal-content .addon-content strong {
+  color: #fff;
+}
+.modal-dark .modal-content .addon-content h1,
+.modal-dark .modal-content .addon-content h2,
+.modal-dark .modal-content .addon-content h3,
+.modal-dark .modal-content .addon-content h4,
+.modal-dark .modal-content .addon-content h5,
+.modal-dark .modal-content .addon-content h6 {
+  color: #fff;
+  margin-top: 1.5rem;
+}
+.modal-dark .modal-content .addon-content ol,
+.modal-dark .modal-content .addon-content ul {
+  list-style-type: unset;
+}
+.modal-dark .modal-content .addon-content ol li,
+.modal-dark .modal-content .addon-content ul li {
+  margin-bottom: 0.3rem;
+}
+.modal-dark .modal-content .addon-content ol li:last-of-type,
+.modal-dark .modal-content .addon-content ul li:last-of-type {
+  margin-bottom: 0;
+}
 .modal-dark .modal-content .swiper {
   padding: 1rem;
+}
+.modal-dark .modal-content .swiper .swiper-button-prev,
+.modal-dark .modal-content .swiper .swiper-button-next {
+  background: #4371e0;
+  color: #fff;
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+.modal-dark .modal-content .swiper .swiper-button-prev:hover,
+.modal-dark .modal-content .swiper .swiper-button-next:hover {
+  background-color: #37a5ff;
+}
+.modal-dark .modal-content .swiper .swiper-button-prev::after,
+.modal-dark .modal-content .swiper .swiper-button-next::after {
+  font-size: 20px;
 }
 .modal-dark .modal-content .modal-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -468,7 +507,7 @@ a:hover, a:focus {
   color: white;
   cursor: pointer;
   z-index: 1051;
-  background: rgba(255, 255, 255, 0.1);
+  background: #4371e0;
   padding: 0.375rem 0.5rem;
   border-radius: 0.5rem;
   transition: all 0.3s;
@@ -476,7 +515,7 @@ a:hover, a:focus {
 .lightbox-overlay .lightbox-close:hover {
   transition: all 0.3s;
   transform: scale(1.05);
-  background-color: #fff;
+  background-color: #37a5ff;
   color: #121212;
 }
 
@@ -760,6 +799,7 @@ a:hover, a:focus {
 }
 .page-addons .browse-addon-card:hover {
   background-color: #232323;
+  cursor: pointer;
 }
 .page-addons .nav-tabs {
   border: none;
@@ -795,6 +835,8 @@ a:hover, a:focus {
 .page-addons .table-addons-installed thead tr th {
   background-color: transparent;
   color: #fff;
+  font-weight: 500;
+  font-size: 15px;
   border-bottom: none;
   padding: 1rem 0 0 1rem;
 }
@@ -807,6 +849,7 @@ a:hover, a:focus {
   padding: 1rem;
   background-color: transparent;
   color: #fff;
+  font-size: 15px;
   border-bottom: none;
 }
 .page-addons .table-addons-installed tbody tr td:first-of-type {
@@ -819,6 +862,7 @@ a:hover, a:focus {
 }
 .page-addons .table-addons-installed tbody tr:hover {
   background-color: #232323;
+  cursor: pointer;
 }
 .page-addons .sticky-controls {
   background-color: #0d0c0c;
@@ -848,6 +892,12 @@ a:hover, a:focus {
   border: none;
   border-radius: 1rem;
   padding: 1rem;
+}
+.page-servers .server-card .card-title {
+  font-size: 16px;
+}
+.page-servers .server-card .card-text {
+  font-size: 14px;
 }
 .page-servers .server-card .server-card-logo {
   width: 80px;
@@ -922,31 +972,49 @@ a:hover, a:focus {
 }
 
 .pagination .page-item .page-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.575rem 0.75rem;
-  background-color: #191919;
+  background-color: transparent;
   color: #fff;
-  border: none;
-  border-radius: 0;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.25rem;
+  width: 2.25rem;
+  height: 2.25rem;
 }
 .pagination .page-item .page-link:hover, .pagination .page-item .page-link:focus, .pagination .page-item .page-link:active {
-  background-color: #272727;
-  color: #4371e0;
+  background-color: #262626;
+  border-color: #262626;
+  color: #fafafa;
   box-shadow: none;
 }
 .pagination .page-item.disabled {
   opacity: 0.9;
 }
 .pagination .page-item.active .page-link {
-  background-color: #4371e0;
-  color: #fff;
+  background-color: #262626;
+  border-color: #262626;
+  color: #fafafa;
 }
 .pagination .page-item.active .page-link:hover {
   opacity: 0.8;
 }
 .pagination .page-item.jump-page .form-control {
-  border: none;
-  border-radius: 0;
-  padding: 9px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.575rem 0.75rem;
+  background-color: transparent;
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.25rem;
+  width: 2.25rem;
+  height: 2.25rem;
 }
 .pagination .page-item.jump-page .form-control::-webkit-inner-spin-button, .pagination .page-item.jump-page .form-control::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -962,6 +1030,7 @@ a:hover, a:focus {
 .context-menu ul li .btn {
   padding: 0.75rem !important;
   color: rgba(255, 255, 255, 0.8);
+  font-weight: 400;
 }
 .context-menu ul li .btn:hover {
   background-color: rgba(255, 255, 255, 0.1);
@@ -1056,31 +1125,55 @@ a:hover, a:focus {
   text-fill-color: transparent;
 }
 .homepage .card-server {
-  background-color: #1f1f1f;
+  background-color: #191919;
 }
-.homepage .card-server img {
-  width: 100px;
-  height: 100px;
+.homepage .card-server .card-body {
+  padding: 1rem;
+}
+.homepage .card-server .card-body img {
+  width: 80px;
+  height: 80px;
   -o-object-fit: cover;
      object-fit: cover;
   margin-right: 10px;
+  border-radius: 0.25rem;
 }
-.homepage .card-server .server-content .card-title {
+.homepage .card-server .card-body .server-content .card-title {
   font-size: 18px;
 }
-.homepage .card-server .server-content .card-text p {
+.homepage .card-server .card-body .server-content .card-text {
+  font-size: 14px;
+}
+.homepage .card-server .card-body .server-content .card-text p {
+  font-size: 14px;
+  font-weight: 500;
   margin-bottom: 0;
 }
 .homepage .card-server:hover {
   background-color: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+.homepage .helptext {
+  font-size: 14px;
 }
 
 .server-page .server-info {
   background-color: #121212;
   border-radius: 1rem !important;
 }
+.server-page .server-info .card-title {
+  font-size: 19px;
+}
+.server-page .server-info .card-text {
+  font-size: 14px;
+}
 .server-page .server-info .btn-restart {
   background-color: #313131;
+}
+.server-page .server-info .control-buttons {
+  padding: 1rem 0;
+  border-top: 1px solid #272727;
+  border-bottom: 1px solid #272727;
 }
 .server-page .server-info .nav-pills .nav-item {
   width: 100%;
@@ -1088,7 +1181,7 @@ a:hover, a:focus {
 .server-page .server-info .nav-pills .nav-item button {
   width: 100%;
   text-align: left;
-  font-weight: 500;
+  font-weight: 400;
   color: #ccc;
 }
 .server-page .server-info .nav-pills .nav-item button:hover {

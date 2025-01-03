@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const ContextMenu = ({ xPos, yPos, onReinstall, onDelete, onViewAddon, onReport, visible, isInstalled, addonImage, addonName }) => {
+const ContextMenu = ({ xPos, yPos, onReinstall, onDelete, onViewAddon, onReport, visible, isInstalled, addonImage, addonName, addonData}) => {
   const [adjustedX, setAdjustedX] = useState(xPos);
   const [adjustedY, setAdjustedY] = useState(yPos);
 
@@ -44,12 +44,12 @@ const ContextMenu = ({ xPos, yPos, onReinstall, onDelete, onViewAddon, onReport,
       <div className="d-flex flex-column align-items-center">
         <div className="d-flex align-items-center gap-3 context-menu-top w-100 p-2">
           <img src={addonImage} alt={addonName} className="img-fluid rounded" />
-          <div className="addon-name text-light fw-bold">{addonName}</div>
+          <div className="addon-name text-light fw-medium">{addonName}</div>
         </div>
         <div className="context-menu-bottom w-100">
           <ul className="list-unstyled m-0">
             <li>
-              <button className="btn btn-link text-decoration-none p-2 w-100 d-flex justify-content-between" onClick={onViewAddon}>
+              <button className="btn btn-link text-decoration-none p-2 w-100 d-flex justify-content-between" onClick={() => onViewAddon(addonData)}>
                 <span>Preview</span>
                 <i className="bi bi-eye"></i>
               </button>

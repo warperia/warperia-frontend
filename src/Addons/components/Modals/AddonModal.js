@@ -116,7 +116,7 @@ const AddonModal = ({ show, onHide, addon, loading }) => {
 
         if (isAuthorCreator) {
             return (
-                <div className="item-developer d-flex align-items-center">
+                <div className="item-developer d-flex align-items-center rounded">
                     <img
                         src={authorAvatarUrl}
                         alt={addon?.author_name || 'Unknown'}
@@ -129,7 +129,7 @@ const AddonModal = ({ show, onHide, addon, loading }) => {
             );
         } else {
             return (
-                <div className="item-developer d-flex align-items-center">
+                <div className="item-developer d-flex align-items-center rounded">
                     <img
                         src="public/no-avatar.jpg"
                         alt="Original Creator"
@@ -149,7 +149,7 @@ const AddonModal = ({ show, onHide, addon, loading }) => {
         }
 
         return developers.map((developer, index) => (
-            <div key={index} className="item-developer d-flex align-items-center mb-3">
+            <div key={index} className="item-developer d-flex align-items-center mb-3 rounded">
                 <img src={developer.avatar_url} alt={developer.display_name} className="rounded-circle me-3" width={50} height={50} />
                 <span>{developer.display_name}</span>
             </div>
@@ -173,12 +173,12 @@ const AddonModal = ({ show, onHide, addon, loading }) => {
                                 </div>
                                 <div className="addon-meta d-flex flex-column">
                                     <div className="name">
-                                        <h4 className="fw-bolder mb-0">{addon?.title}</h4>
+                                        <h4 className="fw-bold mb-0">{addon?.title}</h4>
                                     </div>
                                     <div className="categories">
                                         {addon?.addon_categories && addon.addon_categories.length > 0 ? (
                                             addon.addon_categories.map((category, index) => (
-                                                <span key={index} className="text-muted fw-bold me-1">
+                                                <span key={index} className="text-muted fw-medium me-1">
                                                     {decodeHtmlEntities(category)}{index < addon.addon_categories.length - 1 && ', '}
                                                 </span>
                                             ))
@@ -253,7 +253,7 @@ const AddonModal = ({ show, onHide, addon, loading }) => {
                                                     navigation
                                                     pagination={{ clickable: true }}
                                                     loop={true}
-                                                    modules={[Navigation, Pagination]}
+                                                    modules={[Navigation]}
                                                 >
                                                     {addon.custom_fields.screenshots.map((image, index) => (
                                                         <SwiperSlide key={index}>
@@ -273,12 +273,12 @@ const AddonModal = ({ show, onHide, addon, loading }) => {
                                             <div className="tab-pane fade show active">
                                                 <div className="row row-cols-2 p-3 addon-developers">
                                                     <div className="col">
-                                                        <h5 className="fw-bold">Owner <Tippy content="The original creator of this addon" placement="top"><i className="bi bi-question-circle ms-1"></i></Tippy></h5>
+                                                        <h5 className="fw-medium">Owner <Tippy content="The original creator of this addon" placement="top"><i className="bi bi-question-circle ms-1"></i></Tippy></h5>
                                                         {renderOriginalCreator()}
                                                     </div>
                                                     {developers.length > 0 && (
                                                         <div className="col">
-                                                            <h5 className="fw-bold">Developers <Tippy content="People that worked on the addon - Team Members, Backporters, etc" placement="top"><i className="bi bi-question-circle ms-1"></i></Tippy></h5>
+                                                            <h5 className="fw-medium">Developers <Tippy content="People that worked on the addon - Team Members, Backporters, etc" placement="top"><i className="bi bi-question-circle ms-1"></i></Tippy></h5>
                                                             {renderAdditionalDevelopers()}
                                                         </div>
                                                     )}

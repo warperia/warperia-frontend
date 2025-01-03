@@ -376,7 +376,7 @@ const SessionModal = ({
                       )}
                       <p className="mt-3 mb-1">
                         You have been playing for{" "}
-                        <span className="fw-bold text-primary">
+                        <span className="fw-medium text-primary">
                           {singleSession.durationMinutes}
                         </span>{" "}
                         minutes.
@@ -404,7 +404,7 @@ const SessionModal = ({
                         Warperia will begin tracking your sessions whenever you
                         launch your game.
                       </p>
-                      <p className="text-muted fw-bold">
+                      <p className="text-muted fw-medium">
                         Some additional information:
                       </p>
                       <ul className="text-muted fw-medium">
@@ -437,14 +437,14 @@ const SessionModal = ({
                       <div className="mb-4">
                         <div className="d-flex align-items-center justify-content-between">
                           <div className="left">
-                            <h5 className="fw-bold">Your Playtime Overview</h5>
+                            <h5 className="fw-medium">Your Playtime Overview</h5>
                             <p className="text-muted fw-medium">
                               Take a look at the total amount of hours spent
                               in-game
                             </p>
                           </div>
                           <div className="right text-center">
-                            <p className="text-muted fw-bold mb-0">
+                            <p className="text-muted fw-medium mb-0">
                               Total Playtime
                             </p>
                             <h3>{totalHours} hours</h3>
@@ -490,7 +490,7 @@ const SessionModal = ({
                               className="chart-container card p-2 mb-3"
                               style={{ height: "300px" }}
                             >
-                              <h6 className="mb-1 fw-bold text-center">
+                              <h6 className="mb-1 fw-medium text-center">
                                 {barRange.charAt(0).toUpperCase() +
                                   barRange.slice(1)}{" "}
                                 Playtime
@@ -508,7 +508,7 @@ const SessionModal = ({
                               className="chart-container card p-2 mb-3"
                               style={{ height: "300px" }}
                             >
-                              <h6 className="mb-1 fw-bold text-center">
+                              <h6 className="mb-1 fw-medium text-center">
                                 Servers
                               </h6>
                               <div
@@ -529,7 +529,7 @@ const SessionModal = ({
                           </div>
                         </div>
                       </div>
-                      <h5 className="fw-bold">Game Sessions</h5>
+                      <h5 className="fw-medium">Game Sessions</h5>
                       <p className="text-muted fw-medium">
                         A list of your previous gaming sessions
                       </p>
@@ -612,7 +612,7 @@ const SessionModal = ({
                   </button>
                   {confirmClearAll && (
                     <div className="confirm-overlay d-flex align-items-center">
-                      <span className="text-muted fw-bold me-2">Are you sure?</span>
+                      <span className="text-muted fw-medium me-2">Are you sure?</span>
                       <div className="d-flex justify-content-end gap-2">
                         <button
                           className="btn btn-secondary"

@@ -21,7 +21,7 @@ body {
   margin: 0;
   background-color: $color-1;
   color: #fff;
-  font-family: "Fustat", sans-serif;
+  font-family: "Inter", sans-serif;
   text-rendering: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -330,7 +330,7 @@ a {
     }
 
     .addon-content {
-      color: rgba(255, 255, 255, 0.9);
+      color: #e5e5e5;
 
       .content {
         margin: 0;
@@ -341,10 +341,53 @@ a {
         background-color: rgba(255, 255, 255, 0.1);
         padding: 0.5rem;
       }
+
+      strong {
+        color: #fff;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6 {
+        color: #fff;
+        margin-top: 1.5rem;
+      }
+
+      ol,
+      ul {
+        list-style-type: unset;
+
+        li {
+          margin-bottom: 0.3rem;
+
+          &:last-of-type {
+            margin-bottom: 0;
+          }
+        }
+      }
     }
 
     .swiper {
       padding: 1rem;
+
+      .swiper-button-prev,
+      .swiper-button-next {
+        background: $base-color-4;
+        color: #fff;
+        padding: 1rem;
+        border-radius: 0.5rem;
+
+        &:hover {
+          background-color: $base-color-5;
+        }
+
+        &::after {
+          font-size: 20px;
+        }
+      }
     }
 
     .modal-footer {
@@ -566,7 +609,7 @@ a {
     color: white;
     cursor: pointer;
     z-index: 1051;
-    background: rgba(255, 255, 255, 0.1);
+    background: $base-color-4;
     padding: 0.375rem 0.5rem;
     border-radius: 0.5rem;
     transition: all 0.3s;
@@ -574,7 +617,7 @@ a {
     &:hover {
       transition: all 0.3s;
       transform: scale(1.05);
-      background-color: #fff;
+      background-color: $base-color-5;
       color: #121212;
     }
   }
@@ -947,6 +990,7 @@ a {
 
     &:hover {
       background-color: #232323;
+      cursor: pointer;
     }
   }
 
@@ -995,6 +1039,8 @@ a {
         th {
           background-color: transparent;
           color: #fff;
+          font-weight: 500;
+          font-size: 15px;
           border-bottom: none;
           padding: 1rem 0 0 1rem;
         }
@@ -1011,6 +1057,7 @@ a {
           padding: 1rem;
           background-color: transparent;
           color: #fff;
+          font-size: 15px;
           border-bottom: none;
 
           &:first-of-type {
@@ -1026,6 +1073,7 @@ a {
 
         &:hover {
           background-color: #232323;
+          cursor: pointer;
         }
       }
     }
@@ -1069,6 +1117,14 @@ a {
     border: none;
     border-radius: 1rem;
     padding: 1rem;
+
+    .card-title {
+      font-size: 16px;
+    }
+
+    .card-text {
+      font-size: 14px;
+    }
 
     .server-card-logo {
       width: 80px;
@@ -1159,17 +1215,25 @@ a {
 .pagination {
   .page-item {
     .page-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       padding: 0.575rem 0.75rem;
-      background-color: $base-color-2;
+      background-color: transparent;
       color: #fff;
-      border: none;
-      border-radius: 0;
+      border: 1px solid transparent;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      line-height: 1.25rem;
+      width: 2.25rem;
+      height: 2.25rem;
 
       &:hover,
       &:focus,
       &:active {
-        background-color: $base-color-3;
-        color: $base-color-4;
+        background-color: #262626;
+        border-color: #262626;
+        color: #fafafa;
         box-shadow: none;
       }
     }
@@ -1181,8 +1245,9 @@ a {
 
   .page-item.active {
     .page-link {
-      background-color: $base-color-4;
-      color: #fff;
+      background-color: #262626;
+      border-color: #262626;
+      color: #fafafa;
 
       &:hover {
         opacity: 0.8;
@@ -1192,9 +1257,18 @@ a {
 
   .page-item.jump-page {
     .form-control {
-      border: none;
-      border-radius: 0;
-      padding: 9px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.575rem 0.75rem;
+      background-color: transparent;
+      color: #fff;
+      border: 1px solid transparent;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      line-height: 1.25rem;
+      width: 2.25rem;
+      height: 2.25rem;
 
       &::-webkit-inner-spin-button,
       &::-webkit-outer-spin-button {
@@ -1217,6 +1291,7 @@ a {
       .btn {
         padding: 0.75rem !important;
         color: rgba(255, 255, 255, 0.8);
+        font-weight: 400;
 
         &:hover {
           background-color: rgba(255, 255, 255, 0.1);
@@ -1336,30 +1411,44 @@ a {
   }
 
   .card-server {
-    background-color: #1f1f1f;
+    background-color: $base-color-2;
 
-    img {
-      width: 100px;
-      height: 100px;
-      object-fit: cover;
-      margin-right: 10px;
-    }
+    .card-body {
+      padding: 1rem;
 
-    .server-content {
-      .card-title {
-        font-size: 18px;
+      img {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        margin-right: 10px;
+        border-radius: 0.25rem;
       }
 
-      .card-text {
-        p {
-          margin-bottom: 0;
+      .server-content {
+        .card-title {
+          font-size: 18px;
+        }
+
+        .card-text {
+          font-size: 14px;
+
+          p {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 0;
+          }
         }
       }
     }
 
     &:hover {
       background-color: rgba(255, 255, 255, 0.1);
+      cursor: pointer;
     }
+  }
+
+  .helptext {
+    font-size: 14px;
   }
 }
 
@@ -1368,8 +1457,22 @@ a {
     background-color: $color-2;
     border-radius: 1rem !important;
 
+    .card-title {
+      font-size: 19px;
+    }
+
+    .card-text {
+      font-size: 14px;
+    }
+
     .btn-restart {
       background-color: #313131;
+    }
+
+    .control-buttons {
+      padding: 1rem 0;
+      border-top: 1px solid $base-color-3;
+      border-bottom: 1px solid $base-color-3;
     }
 
     .nav-pills {
@@ -1379,7 +1482,7 @@ a {
         button {
           width: 100%;
           text-align: left;
-          font-weight: 500;
+          font-weight: 400;
           color: #ccc;
 
           &:hover {

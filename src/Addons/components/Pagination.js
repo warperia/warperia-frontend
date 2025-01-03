@@ -35,7 +35,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, onJumpToPage }) => 
 
   return (
     <nav aria-label="Addon pagination" className="mt-5">
-      <ul className="pagination justify-content-center">
+      <ul className="pagination justify-content-center gap-1">
         <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
           <button className="page-link" onClick={() => handlePageChange(currentPage - 1)}>
             <i className="bi bi-arrow-left"></i>

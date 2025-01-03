@@ -469,23 +469,24 @@ const AddonsPage = ({
         }
     };
 
-    const handleViewAddon = async () => {
-        if (contextMenu.addon) {
-            setShowModal(true);
-            setSelectedAddon(null);
-            setAddonLoading(true);
+    const handleViewAddon = async (addonParam) => {
+        const addonToView = addonParam || contextMenu.addon;
+        if (!addonToView) return;
 
-            try {
-                const response = await axios.get(
-                    `${WEB_URL}/wp-json/wp/v2/${currentExpansion}-addons/${contextMenu.addon.id}`
-                );
-                setSelectedAddon(response.data);
-            } catch (error) {
-                console.error("Error fetching addon details:", error);
-                showToastMessage("Failed to load addon details.", "danger");
-            } finally {
-                setAddonLoading(false);
-            }
+        setShowModal(true);
+        setSelectedAddon(null);
+        setAddonLoading(true);
+
+        try {
+            const response = await axios.get(
+                `${WEB_URL}/wp-json/wp/v2/${currentExpansion}-addons/${addonToView.id}`
+            );
+            setSelectedAddon(response.data);
+        } catch (error) {
+            console.error("Error fetching addon details:", error);
+            showToastMessage("Failed to load addon details.", "danger");
+        } finally {
+            setAddonLoading(false);
         }
     };
 
@@ -1633,6 +1634,7 @@ const AddonsPage = ({
                                             onContextMenu={(e) =>
                                                 handleRightClick(e, installedAddon)
                                             }
+                                            onClick={() => handleViewAddon(installedAddon)}
                                         >
                                             <td>
                                                 <div className="d-flex align-items-center gap-3">
@@ -1661,7 +1663,7 @@ const AddonsPage = ({
                                                                 )}
                                                         </div>
                                                         <div
-                                                            className="text-muted fw-bold"
+                                                            className="text-muted fw-medium"
                                                             style={{ fontSize: "0.9rem" }}
                                                         >
                                                             {installedVersion}
@@ -1673,7 +1675,10 @@ const AddonsPage = ({
                                                                     <Tippy content="Switch Addon Variation" placement="top" className="custom-tooltip">
                                                                         <div
                                                                             className="btn btn-link"
-                                                                            onClick={() => openSwitchVariationModal(addon)}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                openSwitchVariationModal(addon);
+                                                                            }}
                                                                         >
                                                                             <i className="bi bi-arrow-left-right text-primary me-1"></i> Switch
                                                                         </div>
@@ -1727,6 +1732,7 @@ const AddonsPage = ({
                             handleUpdateAddon={handleUpdateAddon}
                             handleRightClick={handleRightClick}
                             renderAddonAuthor={renderAddonAuthor}
+                            handleViewAddon={handleViewAddon}
                         />
                     );
                 })}
@@ -1987,6 +1993,7 @@ const AddonsPage = ({
                 isInstalled={contextMenu.isInstalled}
                 addonImage={contextMenu.addonImage}
                 addonName={contextMenu.addonName}
+                addonData={contextMenu.addon}
             />
             {showAddonSelectionModal && (
                 <Suspense
@@ -2022,6 +2029,10 @@ const AddonsPage = ({
                         onSwitchVariation={handleSwitchVariation}
                         currentAddon={currentAddon}
                         loading={loadingVariations}
+                        downloading={downloading}
+                        installingAddonId={installingAddonId}
+                        installingAddonStep={installingAddonStep}
+                        progress={progress}
                     />
                 </Suspense>
             )}

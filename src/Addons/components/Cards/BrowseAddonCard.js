@@ -13,6 +13,7 @@ const BrowseAddonCard = ({
   handleUpdateAddon,
   handleRightClick,
   renderAddonAuthor,
+  handleViewAddon
 }) => {
   // Check if the addon is installed
   const installedVersion = installedAddon
@@ -35,11 +36,12 @@ const BrowseAddonCard = ({
     <div
       className="col-12"
       key={addon.id}
-      onContextMenu={(event) => handleRightClick(event, addon)}
+      onContextMenu={(e) => handleRightClick(e, addon)}
     >
       <div
         className={`card card-addon browse-addon-card ${downloading && installingAddonId === addon.id ? "installing" : ""
           }`}
+        onClick={() => handleViewAddon(addon)}
       >
         <div className="wrapper d-flex align-items-center">
           <div className="left flex-grow-1">
@@ -52,7 +54,7 @@ const BrowseAddonCard = ({
                 />
               </div>
               <div className="details text-break center-part align-self-center">
-                <div className="addon-title text-light fw-bold">
+                <div className="addon-title text-light fw-medium">
                   {addon.title}{" "}
                   <span className="text-muted">
                     by {renderAddonAuthor(addon, true)}
@@ -60,11 +62,11 @@ const BrowseAddonCard = ({
                 </div>
                 {!isInstalling && (
                   <>
-                    <div className="mt-1 mb-2 addon-short text-muted fw-bold">
+                    <div className="mt-1 mb-2 addon-short text-muted fw-medium">
                       {addon.custom_fields.summary}
                     </div>
                     <div className="addon-meta d-flex align-items-center">
-                      <div className="meta-downloads fw-medium text-muted d-flex align-items-center gap-1">
+                      <div className="meta-downloads text-muted d-flex align-items-center gap-1">
                         <i className="bi bi-download"></i>
                         <span>
                           {formatNumber(addon.custom_fields.installs || 0)} Installs
@@ -78,7 +80,7 @@ const BrowseAddonCard = ({
                     <div className="fw-medium text-muted mb-2">
                       {installingAddonStep}
                     </div>
-                    <div className="progress rounded-0">
+                    <div className="progress">
                       <div
                         className="progress-bar progress-bar-animated fw-bold"
                         role="progressbar"
@@ -97,29 +99,35 @@ const BrowseAddonCard = ({
           </div>
           <div className="right">
             <div className="buttons ms-auto align-self-center">
-            {!isInstalling && (
-              <button
-                type="button"
-                className={`btn position-relative ${installedAddon
-                  ? needsUpdate
-                    ? "btn-update btn-primary"
-                    : "btn-installed text-muted"
-                  : "btn-primary"
-                  }`}
-                onClick={(e) =>
-                  installedAddon
+              {!isInstalling && (
+                <button
+                  type="button"
+                  className={`btn position-relative ${installedAddon
                     ? needsUpdate
-                      ? handleUpdateAddon(addon)
-                      : null
-                    : handleInstallAddon(addon, e)
-                }
-                disabled={downloading}
-                title={`${installedVersion || ""} - ${backendVersion}`}
-              >
-                {downloading && installingAddonId === addon.id
-                  ? "Installing"
-                  : buttonText}
-              </button>
+                      ? "btn-update btn-primary"
+                      : "btn-installed text-muted"
+                    : "btn-primary"
+                    }`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (installedAddon) {
+                      if (needsUpdate) {
+                        handleUpdateAddon(addon);
+                      }
+                      // If it's installed but does NOT need an update, we do nothing on click
+                      // or you could do something else if needed.
+                    } else {
+                      // If not installed, handle install
+                      handleInstallAddon(addon, e);
+                    }
+                  }}
+                  disabled={downloading}
+                  title={`${installedVersion || ""} - ${backendVersion}`}
+                >
+                  {downloading && installingAddonId === addon.id
+                    ? "Installing"
+                    : buttonText}
+                </button>
               )}
             </div>
           </div>

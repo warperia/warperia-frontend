@@ -68,9 +68,9 @@ const ServersList = ({ user }) => {
             <div className="content page-servers flex-grow-1">
                 <div className="container my-4">
                     <div className="d-flex align-items-center justify-content-between flex-wrap gap-1 mb-4">
-                        <div>
+                        <div className="page-heading">
                             <h2 className="text-white fw-bold">Servers</h2>
-                            <p className="text-muted fw-medium mb-0">From here you can access and manage your server instances.</p>
+                            <p className="text-muted fw-medium mb-0">Browse your World of Warcraft private server installations</p>
                         </div>
                         <div>
                             <Tippy content="Refresh list" placement="auto" className="custom-tooltip">
@@ -85,7 +85,7 @@ const ServersList = ({ user }) => {
                                 </button>
                             </Tippy>
                             <button
-                                className="btn btn-secondary fw-bold"
+                                className="btn btn-secondary"
                                 onClick={() => setShowAddServerModal(true)}
                             >
                                 <i className="bi bi-plus-lg"></i> Add Server
@@ -101,7 +101,7 @@ const ServersList = ({ user }) => {
                         </div>
                     ) : servers.length === 0 ? (
                         <div className="my-4">
-                            <p className="text-muted fw-bold">Your servers list is currently empty.</p>
+                            <p className="text-muted fw-medium">Your servers list is currently empty.</p>
                         </div>
                     ) : (
                         <div className="row g-3">
@@ -126,7 +126,7 @@ const ServersList = ({ user }) => {
                                         </div>
                                         <div className="server-card-content d-flex justify-content-between align-items-center w-100">
                                             <div className="left">
-                                                <div className="card-title fw-bold">{server.s_name || 'Unnamed Server'}</div>
+                                                <div className="card-title">{server.s_name || 'Unnamed Server'}</div>
                                                 <p className="card-text fw-medium text-muted">
                                                     {server.s_version ? server.s_version.toUpperCase() : 'Unknown'}
                                                 </p>
