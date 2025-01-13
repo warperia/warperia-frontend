@@ -229,37 +229,73 @@ ipcMain.on('process-status-update', (event, status) => {
 });
 
 /* =========================================
-   LIST PROCESSES (WMIC) => array { pid, exePath }
+   LIST PROCESSES using Powershell
 */
 function listProcessesWithPaths() {
-    if (process.platform !== 'win32') return [];
-    const { stdout, stderr } = spawnSync('wmic', ['process', 'get', 'ProcessId,ExecutablePath'], { encoding: 'utf8' });
-    if (stderr && stderr.trim()) {
-        console.error('[listProcessesWithPaths] WMIC error:', stderr);
-    }
-    const lines = stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-
-    const headerIdx = lines.findIndex(line => line.toLowerCase().includes('executablepath'));
-    if (headerIdx !== -1) {
-        lines.splice(headerIdx, 1);
+    if (process.platform !== 'win32') {
+        // Non-Windows: just return an empty array or implement another method.
+        return Promise.resolve([]);
     }
 
-    const results = [];
-    for (const line of lines) {
-        const match = line.match(/^(.*?)\s+(\d+)$/);
-        if (!match) continue;
-        const exePath = match[1].trim();
-        const pid = parseInt(match[2], 10);
-        results.push({ pid, exePath });
-    }
-    return results;
+    // PowerShell command that outputs JSON
+    const script = `Get-WmiObject Win32_Process | Select ProcessId, ExecutablePath | ConvertTo-Json`;
+
+    return new Promise((resolve) => {
+        const ps = spawn('powershell', ['-command', script], {
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+
+        let stdout = '';
+        let stderr = '';
+
+        ps.stdout.on('data', (chunk) => {
+            stdout += chunk;
+        });
+
+        ps.stderr.on('data', (chunk) => {
+            stderr += chunk;
+        });
+
+        ps.on('close', (code) => {
+            if (stderr && stderr.trim()) {
+                console.error('[listProcessesWithPaths] PowerShell error:', stderr);
+            }
+            if (!stdout) {
+                console.warn('[listProcessesWithPaths] PowerShell returned empty stdout. Possibly no processes or missing PowerShell?');
+                return resolve([]);
+            }
+
+            let parsed;
+            try {
+                parsed = JSON.parse(stdout);
+            } catch (err) {
+                console.error('[listProcessesWithPaths] invalid JSON output from PowerShell:', err);
+                return resolve([]);
+            }
+
+            // Convert single object to array if needed
+            if (!Array.isArray(parsed)) {
+                parsed = [parsed];
+            }
+
+            const results = [];
+            for (const item of parsed) {
+                const exePath = item.ExecutablePath;
+                const pid = item.ProcessId;
+                if (exePath && pid) {
+                    results.push({ pid, exePath });
+                }
+            }
+            resolve(results);
+        });
+    });
 }
 
 /* 
    isGameRunning => same fallback approach
 */
-function isGameRunning(exePath) {
-    const all = listProcessesWithPaths();
+async function isGameRunning(exePath) {
+    const all = await listProcessesWithPaths();  // <-- now asynchronous
     const serverDir = path.normalize(path.dirname(exePath)).toLowerCase();
     const serverExeName = path.basename(exePath).toLowerCase();
     const baseName = serverExeName.replace(/\.exe$/i, '');
@@ -287,8 +323,8 @@ function isGameRunning(exePath) {
    findMatchingPIDsForExe => KILL fallback logic
    so if user typed "Wow.exe" but real is "Wow-64.exe"
 */
-function findMatchingPIDsForExe(exePath) {
-    const all = listProcessesWithPaths();
+async function findMatchingPIDsForExe(exePath) {
+    const all = await listProcessesWithPaths();  // <-- now async
     const serverDir = path.normalize(path.dirname(exePath)).toLowerCase();
     const serverExeName = path.basename(exePath).toLowerCase();
     const baseName = serverExeName.replace(/\.exe$/i, '');
@@ -328,8 +364,8 @@ ipcMain.handle('restart-exe', async (event, exePath) => {
         // Mark pending restart
         pendingRestarts[exePath] = true;
 
-        // Find all PIDs to kill in that folder
-        const matchedPIDs = findMatchingPIDsForExe(exePath);
+        // Find all PIDs to kill in that folder (async)
+        const matchedPIDs = await findMatchingPIDsForExe(exePath);
         console.log('[restart-exe] matchedPIDs:', matchedPIDs);
 
         // If none found, we'll just spawn a new instance
@@ -351,7 +387,6 @@ ipcMain.handle('restart-exe', async (event, exePath) => {
         }, 1000);
 
         return { success: true, message: `Restarted. Killed ${matchedPIDs.length} processes.` };
-
     } catch (err) {
         console.error('[restart-exe] Error:', err);
         return { success: false, error: err.message };
@@ -442,8 +477,9 @@ ipcMain.on('start-process-monitoring', (event, { exePath, serverId, intervalMs =
         };
     }
 
-    const doCheck = () => {
-        const isRunning = isGameRunning(exePath);
+    // Make doCheck async so we can await isGameRunning
+    const doCheck = async () => {
+        const isRunning = await isGameRunning(exePath);
         const st = sessionState[exePath];
 
         if (!st.currentlyRunning && isRunning) {
@@ -483,7 +519,6 @@ ipcMain.on('start-process-monitoring', (event, { exePath, serverId, intervalMs =
             const minutes = ms / 1000 / 60;
 
             if (minutes >= SKIP_MINUTES) {
-
                 const realmlist = st.realmlist || '';
 
                 const sessionObj = {
@@ -515,8 +550,14 @@ ipcMain.on('start-process-monitoring', (event, { exePath, serverId, intervalMs =
         }
     };
 
+    // Run it once right away
     doCheck();
-    const handle = setInterval(doCheck, intervalMs);
+
+    // Then run at the given interval
+    const handle = setInterval(() => {
+        doCheck();
+    }, intervalMs);
+
     monitoringIntervals.set(exePath, handle);
 });
 
