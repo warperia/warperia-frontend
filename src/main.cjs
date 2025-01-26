@@ -130,7 +130,8 @@ function createMainWindow() {
             nodeIntegration: true,
             nodeIntegrationInWorker: true,
             contextIsolation: true,
-            devTools: true
+            devTools: false,
+            // webSecurity: false
         }
     });
 
@@ -527,7 +528,7 @@ ipcMain.on('start-process-monitoring', (event, { exePath, serverId, intervalMs =
                     durationMinutes: Math.round(minutes * 100) / 100,
                     realmlist
                 };
-                
+
                 saveSessionToFile(exePath, sessionObj);
 
                 if (mainWindow) {
@@ -537,6 +538,15 @@ ipcMain.on('start-process-monitoring', (event, { exePath, serverId, intervalMs =
                         session: sessionObj
                     });
                 }
+            }
+
+            // Restore the backup of Config.wtf after the game closes
+            const configPath = path.join(path.dirname(exePath), 'WTF', 'Config.wtf');
+            const backupPath = path.join(path.dirname(exePath), 'WTF', 'Config.wtf.backup');
+
+            if (fs.existsSync(backupPath)) {
+                fs.copyFileSync(backupPath, configPath);
+                fs.unlinkSync(backupPath); // Delete the backup after restoring
             }
         }
 

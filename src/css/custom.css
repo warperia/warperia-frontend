@@ -56,6 +56,13 @@ a:hover, a:focus {
   color: #f10040 !important;
 }
 
+.alert-path-info {
+  background-color: #ff9e00;
+  border: none;
+  color: #121212;
+  padding: 0.375rem 0.75rem;
+}
+
 .form-control {
   background-color: #191919;
   border-color: rgba(255, 255, 255, 0.1);
@@ -78,6 +85,44 @@ a:hover, a:focus {
 }
 .form-control:read-only {
   background-color: #191919;
+}
+
+.form-check-input:checked {
+  background-color: #4371e0;
+  border-color: #4371e0;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba(255,255,255,1)'/></svg>") !important;
+}
+.form-check-input:checked.bigger {
+  width: 3em;
+  height: 1.5em;
+}
+.form-check-input:checked:focus {
+  box-shadow: none;
+}
+.form-check-input:checked:active {
+  filter: none;
+}
+
+.form-check-input {
+  background-color: #272727;
+  border-color: #272727;
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba(255,255,255,1)'/></svg>") !important;
+}
+.form-check-input.bigger {
+  width: 3em;
+  height: 1.5em;
+}
+.form-check-input:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+.form-check-input:active {
+  filter: none;
+}
+.form-check-input:hover {
+  cursor: pointer;
+  filter: brightness(1.25);
+  transition: all 0.3s;
 }
 
 .btn:focus {
@@ -260,6 +305,10 @@ a:hover, a:focus {
   font-weight: 900 !important;
 }
 
+.swiper .swiper-slide {
+  height: auto !important;
+}
+
 .modal-dark .modal-content {
   background-color: #191919;
   border-radius: 1rem;
@@ -335,6 +384,14 @@ a:hover, a:focus {
 .modal-dark .modal-content .swiper .swiper-button-prev::after,
 .modal-dark .modal-content .swiper .swiper-button-next::after {
   font-size: 20px;
+}
+.modal-dark .modal-content .modification-item {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 1.5rem;
+}
+.modal-dark .modal-content .modification-item:last-of-type {
+  border-bottom: none;
+  padding-bottom: 1rem;
 }
 .modal-dark .modal-content .modal-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -459,6 +516,23 @@ a:hover, a:focus {
   border-color: #4371e0;
 }
 
+.modal-delete .list-group .list-group-item {
+  background-color: #121212;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  color: #fff;
+}
+.modal-delete .list-group .list-group-item h6 {
+  color: #fff;
+}
+.modal-delete .list-group .list-group-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.modal-delete .list-group .list-group-item:last-of-type {
+  border-bottom: none;
+}
+
 .delete-modal-overlay {
   z-index: 1060;
 }
@@ -479,7 +553,7 @@ a:hover, a:focus {
 
 .lightbox-overlay {
   position: fixed;
-  top: 0;
+  top: 30px;
   left: 0;
   width: 100%;
   height: 100%;
@@ -489,19 +563,30 @@ a:hover, a:focus {
   justify-content: center;
   z-index: 1050;
 }
+.lightbox-overlay .swiper-wrapper {
+  align-items: center;
+}
 .lightbox-overlay .lightbox-image {
-  max-width: 90%;
-  max-height: 90%;
-  width: 100%;
-  height: 100%;
+  max-width: 50%;
+  max-height: 50%;
+  width: auto;
+  height: auto;
+  -o-object-fit: contain;
+     object-fit: contain;
   margin: 0 auto;
   text-align: center;
   display: block;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -o-user-select: none;
+  user-select: none;
 }
 .lightbox-overlay .lightbox-close {
   position: absolute;
-  top: 40px;
-  right: 50px;
+  bottom: 40px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0 auto;
   font-size: 16px;
   font-weight: 600;
   color: white;
@@ -514,7 +599,6 @@ a:hover, a:focus {
 }
 .lightbox-overlay .lightbox-close:hover {
   transition: all 0.3s;
-  transform: scale(1.05);
   background-color: #37a5ff;
   color: #121212;
 }
@@ -528,6 +612,12 @@ a:hover, a:focus {
 .addon-developers .item-developer {
   background-color: rgba(255, 255, 255, 0.1);
   padding: 0.5rem;
+}
+.addon-developers .item-developer img {
+  height: 50px;
+  width: 50px;
+  -o-object-fit: cover;
+     object-fit: cover;
 }
 
 .auth-container {
@@ -637,8 +727,8 @@ a:hover, a:focus {
   flex: 0 0 auto;
 }
 .page-addons .card-addon .wrapper .image img {
-  width: 110px;
-  height: 110px;
+  width: 100px;
+  height: 100px;
   -o-object-fit: cover;
      object-fit: cover;
 }
@@ -769,20 +859,35 @@ a:hover, a:focus {
 }
 .page-addons .browse-addon-card {
   background-color: #1f1f1f;
-  border-radius: 1rem;
+  border-radius: 0;
 }
 .page-addons .browse-addon-card .wrapper .left .image img {
   border-radius: 0.5rem;
+  will-change: transform;
+  transition: all 0.3s;
 }
 .page-addons .browse-addon-card .wrapper .left .details {
   flex-direction: column;
+}
+.page-addons .browse-addon-card .wrapper .left .details .addon-short {
+  font-size: 15px;
+}
+.page-addons .browse-addon-card .wrapper .left .details .meta-author {
+  padding: 0.2rem 0.4rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  font-size: 14px;
+  color: #d7d7d7;
 }
 .page-addons .browse-addon-card .wrapper .left .center-part {
   width: 70%;
   margin-right: 1rem;
 }
+.page-addons .browse-addon-card .wrapper .right {
+  width: 20%;
+}
 .page-addons .browse-addon-card .wrapper .right .buttons {
-  width: 30%;
+  width: 100%;
+  margin-top: 10px;
 }
 .page-addons .browse-addon-card .wrapper .right .buttons button {
   float: right;
@@ -797,9 +902,57 @@ a:hover, a:focus {
 .page-addons .browse-addon-card .wrapper .progress-bar {
   background-color: #4371e0;
 }
-.page-addons .browse-addon-card:hover {
-  background-color: #232323;
+.page-addons .browse-addon-card .wrapper hr {
+  color: #fff;
+  opacity: 0.1;
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+  margin-left: 10px;
+}
+.page-addons .browse-addon-card .wrapper .categories {
+  margin-left: 10px;
+}
+.page-addons .browse-addon-card .wrapper .categories .name {
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-right: 0.5rem;
+  padding: 0.15rem 0.4rem;
+}
+.page-addons .browse-addon-card .wrapper .categories ul {
+  list-style-type: none;
+  margin-top: 0rem;
+  margin-bottom: 0;
+  padding-left: 0;
+}
+.page-addons .browse-addon-card .wrapper .categories ul li {
+  display: inline;
+  color: #d7d7d7;
+  font-size: 13px;
+}
+.page-addons .browse-addon-card .wrapper .categories ul li.more-categories {
+  color: #888;
   cursor: pointer;
+  margin-left: 0.5rem;
+}
+.page-addons .browse-addon-card .wrapper .categories ul .separator {
+  color: rgba(255, 255, 255, 0.1);
+  margin: 0 5px;
+}
+.page-addons .browse-addon-card .wrapper .addon-meta .meta-item {
+  font-size: 13px;
+  font-weight: 400;
+}
+.page-addons .browse-addon-card .wrapper .addon-meta .meta-item span,
+.page-addons .browse-addon-card .wrapper .addon-meta .meta-item i {
+  color: #d7d7d7;
+}
+.page-addons .browse-addon-card:hover {
+  background-color: #292929;
+  cursor: pointer;
+}
+.page-addons .browse-addon-card:hover .card-img-top {
+  transform: scale(1.03);
+  transition: all 0.3s;
 }
 .page-addons .nav-tabs {
   border: none;
@@ -853,12 +1006,22 @@ a:hover, a:focus {
   border-bottom: none;
 }
 .page-addons .table-addons-installed tbody tr td:first-of-type {
-  border-top-left-radius: 0.5rem;
-  border-bottom-left-radius: 0.5rem;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 .page-addons .table-addons-installed tbody tr td:last-of-type {
-  border-top-right-radius: 0.5rem;
-  border-bottom-right-radius: 0.5rem;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.page-addons .table-addons-installed tbody tr .accordion-button {
+  display: inline;
+  padding: 1px 5px;
+  background-color: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+.page-addons .table-addons-installed tbody tr .accordion-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #fff !important;
 }
 .page-addons .table-addons-installed tbody tr:hover {
   background-color: #232323;
@@ -971,6 +1134,20 @@ a:hover, a:focus {
   color: #fff;
 }
 
+.default-select {
+  background: #272727;
+  border: none;
+  color: #fff;
+  padding: 0.55rem 0.75rem;
+}
+.default-select:hover {
+  filter: brightness(1.25);
+  cursor: pointer;
+}
+.default-select:focus-visible {
+  outline: none;
+}
+
 .pagination .page-item .page-link {
   display: flex;
   align-items: center;
@@ -1025,29 +1202,56 @@ a:hover, a:focus {
 
 .context-menu {
   border: 1px solid rgba(99, 99, 99, 0.1);
-  max-width: 500px;
+  max-width: 350px;
+  box-shadow: 4px 4px 4px 0px #101010;
 }
 .context-menu ul li .btn {
   padding: 0.75rem !important;
   color: rgba(255, 255, 255, 0.8);
   font-weight: 400;
+  border-radius: 0;
 }
 .context-menu ul li .btn:hover {
   background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 0;
   color: #fff;
 }
 .context-menu ul li .btn.btn-delete {
   color: #ff5858;
 }
+.context-menu ul li:first-of-type {
+  margin-top: 0.5rem;
+}
+.context-menu ul li:last-of-type {
+  margin-bottom: 0.5rem;
+}
 .context-menu .context-menu-top {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 0.5rem;
 }
 .context-menu .context-menu-top img {
   width: 40px;
   height: 40px;
   -o-object-fit: cover;
      object-fit: cover;
+}
+.context-menu hr {
+  margin: 0.5rem 0;
+  color: #fff;
+  opacity: 0.1;
+}
+
+.context-submenu {
+  max-width: 500px;
+  min-width: 250px;
+}
+.context-submenu ul li .btn {
+  padding: 0.75rem !important;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 400;
+}
+.context-submenu ul li .btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  color: #fff;
 }
 
 .sidenav {
@@ -1056,8 +1260,8 @@ a:hover, a:focus {
   z-index: 999;
   left: 0;
   top: 30px;
-  background-color: #121212;
-  border-right: 1px solid #1c1c1c;
+  background-color: #1e1e1e;
+  border-right: 1px solid #2e2e2e;
   height: calc(100% - 30px);
 }
 .sidenav .logo {
@@ -1157,15 +1361,23 @@ a:hover, a:focus {
   font-size: 14px;
 }
 
+.server-page .server-container {
+  background-color: #121212;
+  min-height: 100vh !important;
+}
 .server-page .server-info {
   background-color: #121212;
-  border-radius: 1rem !important;
+  border: none;
 }
 .server-page .server-info .card-title {
   font-size: 19px;
 }
 .server-page .server-info .card-text {
   font-size: 14px;
+}
+.server-page .server-info .card-text .realmlist:hover {
+  cursor: pointer;
+  color: #dbdbdb;
 }
 .server-page .server-info .btn-restart {
   background-color: #313131;
@@ -1194,6 +1406,10 @@ a:hover, a:focus {
 .server-page .server-info .nav-pills .nav-item button.active {
   background-color: rgba(255, 255, 255, 0.1);
   color: #fff;
+}
+.server-page .server-info hr {
+  color: #272727;
+  opacity: 1;
 }
 
 ::-webkit-scrollbar {

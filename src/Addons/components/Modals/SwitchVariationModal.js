@@ -18,6 +18,7 @@ const SwitchVariationModal = ({ show, onHide, availableVariations, onSwitchVaria
     setLoadingVariationId(variation.id); 
     await onSwitchVariation(variation);
     setLoadingVariationId(null);
+    onHide();
   };
 
   return (

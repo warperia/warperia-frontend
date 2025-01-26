@@ -2,7 +2,7 @@ import axios from 'axios';
 import { WEB_URL } from './../../config.js';
 
 const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+const CACHE_TTL = 5 * 60 * 1000;
 const cacheTimestamps = new Map();
 
 function generateCacheKey(expansion, page, search, categories, pageSize, orderby, order) {
@@ -30,7 +30,7 @@ const fetchAddons = async (expansion, page = 1, search = '', categories = [], pa
             page,
             per_page: pageSize,
             orderby,
-            order
+            order,
         };
 
         if (categories.length > 0) {

@@ -27,13 +27,14 @@ module.exports = {
     plugins: [
         new HtmlWebpackPlugin({
             template: './public/index.html',
-            filename: 'index.html'  // Output the index.html into the dist folder
+            filename: 'index.html'
         }),
         new CopyWebpackPlugin({
             patterns: [
                 { from: 'public', to: 'public' },
                 { from: 'public/icons', to: 'icons' }, 
                 { from: 'public/renderer.js', to: 'renderer.js' },
+                { from: 'public/title-logo.png', to: 'title-logo.png' },
             ]
         })
     ],

@@ -1,1 +1,1 @@
-export const WEB_URL = "https://warperia.com/";
+export const WEB_URL = ""; // Database

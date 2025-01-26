@@ -218,7 +218,7 @@ const AddServerModal = ({ show, onClose, user, refreshServers }) => {
             {show && <div className="modal-overlay"></div>}
             <div className={`modal fade ${show ? 'show d-block' : ''}`} tabIndex="-1" role="dialog" style={{ display: show ? 'block' : 'none' }}>
                 <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable modal-dark modal-add-user-server">
-                    <div className="modal-content rounded-0">
+                    <div className="modal-content">
                         <div className="modal-header">
                             <h5 className="modal-title">Add Server</h5>
                             <button

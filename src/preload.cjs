@@ -127,16 +127,28 @@ try {
     // --------------------------------
     // LAUNCH / TERMINATE EXE
     // --------------------------------
-    launchExe: (exePath) => {
-      const { spawn, execSync } = require('child_process');
+    launchExe: async (exePath) => {
+      const { spawn } = require('child_process');
       const fs = require('fs');
+      const path = require('path');
+    
       if (!fs.existsSync(exePath)) {
         throw new Error('Executable file not found.');
       }
-      // Just spawn the user-typed exe
+    
+      // Backup Config.wtf before launching the game
+      const configPath = path.join(path.dirname(exePath), 'WTF', 'Config.wtf');
+      const backupPath = path.join(path.dirname(exePath), 'WTF', 'Config.wtf.backup');
+    
+      if (fs.existsSync(configPath)) {
+        fs.copyFileSync(configPath, backupPath);
+        console.log('[MODIFICATIONS] Created backup of Config.wtf');
+      }
+    
+      // Launch the game
       const processInstance = spawn(exePath, [], {
         detached: true,
-        stdio: 'ignore'
+        stdio: 'ignore',
       });
       processInstance.unref();
     },

@@ -12,6 +12,9 @@ const EditServerModal = lazy(() =>
 const SessionModal = lazy(() =>
   import("./../components/Modals/SessionModal.js")
 );
+const ModificationsModal = lazy(() =>
+  import("./../components/Modals/ModificationsModal.js")
+);
 
 const knownLocales = [
   "enUS",
@@ -43,6 +46,9 @@ const ServerPage = ({ user }) => {
   const expansion = server?.s_version || "Unknown Expansion";
 
   const handleEditServer = () => setShowEditModal(true);
+
+  // Game Modifications
+  const [showModificationsModal, setShowModificationsModal] = useState(false);
 
   // -------------------------------------------
   // FETCH SERVER DATA
@@ -326,7 +332,7 @@ const ServerPage = ({ user }) => {
   if (serverNotFound) {
     return (
       <div className="d-flex">
-        <Sidebar setPage={() => {}} />
+        <Sidebar setPage={() => { }} />
         <div className="content page-addons flex-grow-1">
           <div className="container">
             <div className="my-4">
@@ -356,121 +362,140 @@ const ServerPage = ({ user }) => {
 
   return (
     <div className="d-flex">
-      <Sidebar setPage={() => {}} />
+      <Sidebar setPage={() => { }} />
       <div className="content page-addons flex-grow-1">
         <div className="container-fluid server-page">
           <div className="row">
             <div className="col-12 col-lg-3 left">
-              <div className="server-info card mb-4 sticky-top">
-                <div className="card-body d-flex flex-column gap-3">
-                  <div className="d-flex align-items-center flex-wrap gap-2">
-                    <img
-                      src={server.s_image || "public/default-image.jpg"}
-                      alt={server.s_name}
-                      className="img-fluid rounded me-3"
-                      style={{
-                        width: "100px",
-                        height: "100px",
-                        objectFit: "cover",
-                      }}
-                    />
-                    <div>
-                      <h3 className="card-title text-white">
-                        {server.s_name || "Unnamed Server"}
-                      </h3>
-                      <p className="card-text fw-medium text-muted mb-0">
-                        <span className="text-light">Expansion:</span>{" "}
-                        <span className="text-uppercase">{expansion}</span>
-                      </p>
-                      {serverRealmlist && (
-                        <p className="card-text fw-medium text-muted">
-                          <span className="text-light">Realmlist:</span>{" "}
-                          <span>{serverRealmlist}</span>
+              <div className="server-container h-100">
+                <div className="server-info card mb-4 sticky-top">
+                  <div className="card-body d-flex flex-column gap-3">
+                    <div className="d-flex align-items-center flex-wrap gap-2">
+                      <img
+                        src={server.s_image || "public/default-image.jpg"}
+                        alt={server.s_name}
+                        className="img-fluid rounded me-3"
+                        draggable = "false"
+                        style={{
+                          width: "100px",
+                          height: "100px",
+                          objectFit: "cover",
+                        }}
+                      />
+                      <div className="flex-grow-1">
+                        <h3 className="card-title text-white d-flex align-items-center justify-content-between">
+                          {server.s_name || "Unnamed Server"}
+                          <Tippy
+                            content="Edit Server"
+                            placement="bottom"
+                            className="custom-tooltip"
+                          >
+                            <button
+                              className="btn btn-link"
+                              onClick={handleEditServer}
+                            >
+                              <i className="bi bi-pencil-square"></i>
+                            </button>
+                          </Tippy>
+                        </h3>
+                        <p className="card-text fw-medium text-muted mb-0">
+                          <span className="text-light">Expansion:</span>{" "}
+                          <span className="text-uppercase">{expansion}</span>
                         </p>
-                      )}
+                        {serverRealmlist && (
+                          <p className="card-text fw-medium text-muted">
+                            <span className="text-light">Realmlist:</span>{" "}
+                            <Tippy
+                              content="Click to edit"
+                              placement="bottom"
+                              className="custom-tooltip"
+                            >
+                              <span className="realmlist" onClick={handleEditServer}>{serverRealmlist}</span>
+                            </Tippy>
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="d-flex align-items-center gap-2 mt-3 control-buttons">
-                    <Tippy
-                      content="Start playing"
-                      placement="bottom"
-                      className="custom-tooltip"
-                    >
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={handleLaunch}
-                        disabled={isRunning}
+                    <div className="d-flex align-items-center gap-2 mt-3 control-buttons">
+                      <Tippy
+                        content="Start playing"
+                        placement="bottom"
+                        className="custom-tooltip"
                       >
-                        <i className="bi bi-play-fill"></i>
-                        {isRunning ? " Running" : " Launch"}
-                      </button>
-                    </Tippy>
-                    <Tippy
-                      content="Restart game"
-                      placement="bottom"
-                      className="custom-tooltip"
-                    >
-                      <button
-                        className="btn btn-sm btn-secondary btn-restart"
-                        onClick={handleRestart}
-                        disabled={!isRunning}
+                        <button
+                          className="btn btn-sm btn-primary"
+                          onClick={handleLaunch}
+                          disabled={isRunning}
+                        >
+                          <i className="bi bi-play-fill"></i>
+                          {isRunning ? " Running" : " Launch"}
+                        </button>
+                      </Tippy>
+                      <Tippy
+                        content="Restart game"
+                        placement="bottom"
+                        className="custom-tooltip"
                       >
-                        <i className="bi bi-arrow-clockwise"></i> Restart
-                      </button>
-                    </Tippy>
-                    <Tippy
-                      content="Open directory"
-                      placement="bottom"
-                      className="custom-tooltip"
-                    >
-                      <button
-                        className="ms-auto btn btn-link"
-                        onClick={() => handleOpenDirectory(server.s_dir)}
+                        <button
+                          className="btn btn-sm btn-secondary btn-restart"
+                          onClick={handleRestart}
+                          disabled={!isRunning}
+                        >
+                          <i className="bi bi-arrow-clockwise"></i> Restart
+                        </button>
+                      </Tippy>
+                      <Tippy
+                        content="Open directory"
+                        placement="bottom"
+                        className="custom-tooltip"
                       >
-                        <i className="bi bi-folder-symlink vertical-fix"></i>
-                      </button>
-                    </Tippy>
-                  </div>
-                  <div className="mt-3">
-                    <ul className="nav nav-pills flex-column">
-                      <li className="nav-item mb-1">
                         <button
-                          className={`nav-link ${
-                            activeTab === "myAddons" ? "active" : ""
-                          }`}
-                          onClick={() => setActiveTab("myAddons")}
+                          className="ms-auto btn btn-link"
+                          onClick={() => handleOpenDirectory(server.s_dir)}
                         >
-                          <i className="bi bi-box me-2"></i>{" "}
-                          <span>Installed Addons</span>
+                          <i className="bi bi-folder-symlink vertical-fix"></i>
                         </button>
-                      </li>
-                      <li className="nav-item mb-1">
-                        <button
-                          className={`nav-link ${
-                            activeTab === "browseAddons" ? "active" : ""
-                          }`}
-                          onClick={() => setActiveTab("browseAddons")}
-                        >
-                          <i className="bi bi-search me-2"></i>{" "}
-                          <span>Browse Addons</span>
-                        </button>
-                      </li>
-                      <li className="nav-item">
-                        <button
-                          className="nav-link"
-                          onClick={handleViewSessions}
-                        >
-                          <i className="bi bi-clock-history me-2"></i>{" "}
-                          <span>View Sessions</span>
-                        </button>
-                      </li>
-                      <li className="nav-item">
-                        <button className="nav-link" onClick={handleEditServer}>
-                          <i className="bi bi-gear me-2"></i>{" "}
-                          <span>Edit Server</span>
-                        </button>
-                      </li>
-                    </ul>
+                      </Tippy>
+                    </div>
+                    <div className="mt-3">
+                      <ul className="nav nav-pills flex-column">
+                        <li className="nav-item mb-1">
+                          <button
+                            className={`nav-link ${activeTab === "myAddons" ? "active" : ""
+                              }`}
+                            onClick={() => setActiveTab("myAddons")}
+                          >
+                            <i className="bi bi-box me-2"></i>{" "}
+                            <span>Installed Addons</span>
+                          </button>
+                        </li>
+                        <li className="nav-item mb-1">
+                          <button
+                            className={`nav-link ${activeTab === "browseAddons" ? "active" : ""
+                              }`}
+                            onClick={() => setActiveTab("browseAddons")}
+                          >
+                            <i className="bi bi-search me-2"></i>{" "}
+                            <span>Browse Addons</span>
+                          </button>
+                        </li>
+                        <hr></hr>
+                        <li className="nav-item">
+                          <button className="nav-link" onClick={() => setShowModificationsModal(true)}>
+                            <i className="bi bi-tools me-2"></i> <span>Modifications</span>
+                          </button>
+                        </li>
+                        <li className="nav-item">
+                          <button
+                            className="nav-link"
+                            onClick={handleViewSessions}
+                          >
+                            <i className="bi bi-clock-history me-2"></i>{" "}
+                            <span>Sessions</span>
+                          </button>
+                        </li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -484,6 +509,7 @@ const ServerPage = ({ user }) => {
                 serverPath={server.s_path}
                 gamePath={server.s_dir}
                 currentExpansion={expansion.toLowerCase()}
+                serverId={server.s_id}
               />
             </div>
           </div>
@@ -511,6 +537,11 @@ const ServerPage = ({ user }) => {
           />
         </Suspense>
       )}
+      <ModificationsModal
+        show={showModificationsModal}
+        onClose={() => setShowModificationsModal(false)}
+        server={server}
+      />
       <SessionModal
         show={showSessionModal}
         onClose={() => {

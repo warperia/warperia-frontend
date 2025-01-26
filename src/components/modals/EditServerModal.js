@@ -600,7 +600,7 @@ const EditServerModal = ({ show, onClose, user, server, refreshServers }) => {
         style={{ display: show ? "block" : "none" }}
       >
         <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable modal-dark modal-add-user-server">
-          <div className="modal-content rounded-0">
+          <div className="modal-content">
             <div className="modal-header">
               <h5 className="modal-title">Edit Server</h5>
               <button

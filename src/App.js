@@ -90,6 +90,14 @@ const App = () => {
     };
   }, []);
 
+  useEffect(() => {
+    // Remove the loading screen once the app mounts
+    const loadingScreen = document.getElementById('loading-screen');
+    if (loadingScreen) {
+        loadingScreen.remove();
+    }
+}, []);
+
   return (
     <Router>
       <div className="h-100">

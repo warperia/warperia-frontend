@@ -58,6 +58,17 @@ const SessionModal = ({
     setDisplayCount(PAGE_SIZE);
   }, [allSessions]);
 
+  // Format to hours
+  const formatDuration = (minutes) => {
+    if (minutes < 60) {
+      return `${Math.round(minutes)} min`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = Math.round(minutes % 60);
+      return `${hours}h ${remainingMinutes}m`;
+    }
+  };
+
   // -----------------------------
   // 1) Sort sessions (newest first)
   // -----------------------------
@@ -169,12 +180,12 @@ const SessionModal = ({
   // daily => line chart with hourOfDayMap
   const buildDailyLineData = () => {
     const labels = [...Array(24).keys()].map((h) => `${h}:00`);
-    const data = hourOfDayMap;
+    const data = hourOfDayMap.map((minutes) => (minutes / 60).toFixed(1));
     return {
       labels,
       datasets: [
         {
-          label: "Today's Playtime (min)",
+          label: "Today's Playtime (hours)",
           data,
           borderColor: "#4371e0",
           backgroundColor: "#4371e0",
@@ -194,12 +205,12 @@ const SessionModal = ({
       "Friday",
       "Saturday",
     ];
+    const data = dayOfWeekMap.map((minutes) => (minutes / 60).toFixed(1));
     return {
       labels: dayLabels,
       datasets: [
         {
-          label: "Weekly Time (min)",
-          data: dayOfWeekMap,
+          data,
           backgroundColor: "#4371e0",
         },
       ],
@@ -209,12 +220,12 @@ const SessionModal = ({
   // monthly => line chart with monthlyWeekMap
   const buildMonthlyLineData = () => {
     const keys = [...monthlyWeekMap.keys()].sort();
-    const values = keys.map((k) => monthlyWeekMap.get(k));
+    const values = keys.map((k) => (monthlyWeekMap.get(k) / 60).toFixed(1));
     return {
       labels: keys,
       datasets: [
         {
-          label: "Monthly Time (min)",
+          label: "Monthly Time (hours)",
           data: values,
           borderColor: "#4371e0",
           backgroundColor: "#4371e0",
@@ -226,12 +237,12 @@ const SessionModal = ({
   // realm distribution => pie
   const buildRealmPieData = () => {
     const realms = [...realmMap.keys()];
-    const vals = realms.map((r) => realmMap.get(r));
+    const vals = realms.map((r) => (realmMap.get(r) / 60).toFixed(1));
     return {
       labels: realms,
       datasets: [
         {
-          label: "Realm Distribution",
+          label: "Total Hours",
           data: vals,
           backgroundColor: [
             "#0d6efd",
@@ -258,36 +269,48 @@ const SessionModal = ({
     plugins: {
       legend: { display: false },
       title: { display: false },
+      tooltip: {
+        displayColors: false,
+        backgroundColor: "#000",
+        titleColor: "#ffffff",
+        bodyColor: "#ffffff",
+        bodyFont: {
+          size: 15,
+        },
+        titleFont: {
+          size: 16,
+        },
+        padding: 10,
+        callbacks: {
+          title: (tooltipItems) => {
+            return tooltipItems[0].label;
+          },
+          label: (tooltipItem) => {
+            const value = tooltipItem.raw;
+            return `Playtime: ${value}h`;
+          },
+        },
+      },
     },
     scales: {
       y: {
         beginAtZero: true,
-        title: { display: true, text: "Total Time (min)" },
+        title: { display: true, text: "Total Time (hours)" },
       },
     },
   };
 
-  if (barRange === "daily") {
-    mainChartType = "line";
-    mainChartData = buildDailyLineData();
-    mainChartOptions.scales.y.title.text = "Today's Time (min)";
-  } else if (barRange === "weekly") {
+  if (barRange === "weekly") {
     mainChartType = "bar";
     mainChartData = buildWeeklyBarData();
-    mainChartOptions.scales.y.title.text = "Weekly Time (min)";
+    mainChartOptions.scales.y.title.text = "Weekly Playtime";
   } else if (barRange === "monthly") {
     mainChartType = "line";
     mainChartData = buildMonthlyLineData();
-    mainChartOptions.scales.y.title.text = "Monthly Time (min)";
+    mainChartOptions.scales.y.title.text = "Monthly Playtime";
   }
 
   const renderMainChart = () => {
-    if (barRange === "daily") {
-      const totalDaily = hourOfDayMap.reduce((sum, val) => sum + val, 0);
-      if (totalDaily === 0) {
-        return <p>No data available for today</p>;
-      }
-    }
     if (mainChartType === "line") {
       return <Line data={mainChartData} options={mainChartOptions} />;
     }
@@ -339,7 +362,7 @@ const SessionModal = ({
         role="dialog"
         style={{ display: show ? "block" : "none" }}
       >
-        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl modal-dark modal-sessions">
+        <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fixed-height modal-xl modal-dark modal-sessions">
           <div className="modal-content">
             <div className="modal-header">
               <h5 className="modal-title">
@@ -377,7 +400,7 @@ const SessionModal = ({
                       <p className="mt-3 mb-1">
                         You have been playing for{" "}
                         <span className="fw-medium text-primary">
-                          {singleSession.durationMinutes}
+                          {formatDuration(singleSession.durationMinutes)}
                         </span>{" "}
                         minutes.
                       </p>
@@ -453,31 +476,19 @@ const SessionModal = ({
 
                         <div className="d-flex gap-2 mb-2">
                           <button
-                            className={`btn btn-sm ${
-                              barRange === "daily"
-                                ? "btn-primary"
-                                : "btn-secondary-2"
-                            }`}
-                            onClick={() => setBarRange("daily")}
-                          >
-                            Daily
-                          </button>
-                          <button
-                            className={`btn btn-sm ${
-                              barRange === "weekly"
-                                ? "btn-primary"
-                                : "btn-secondary-2"
-                            }`}
+                            className={`btn btn-sm ${barRange === "weekly"
+                              ? "btn-primary"
+                              : "btn-secondary-2"
+                              }`}
                             onClick={() => setBarRange("weekly")}
                           >
                             Weekly
                           </button>
                           <button
-                            className={`btn btn-sm ${
-                              barRange === "monthly"
-                                ? "btn-primary"
-                                : "btn-secondary-2"
-                            }`}
+                            className={`btn btn-sm ${barRange === "monthly"
+                              ? "btn-primary"
+                              : "btn-secondary-2"
+                              }`}
                             onClick={() => setBarRange("monthly")}
                           >
                             Monthly
@@ -521,6 +532,28 @@ const SessionModal = ({
                                     maintainAspectRatio: false,
                                     plugins: {
                                       legend: { position: "bottom" },
+                                      tooltip: {
+                                        displayColors: false,
+                                        backgroundColor: "#000",
+                                        titleColor: "#ffffff",
+                                        bodyColor: "#ffffff",
+                                        bodyFont: {
+                                          size: 15,
+                                        },
+                                        titleFont: {
+                                          size: 16,
+                                        },
+                                        padding: 10,
+                                        callbacks: {
+                                          title: (tooltipItems) => {
+                                            return tooltipItems[0].label;
+                                          },
+                                          label: (tooltipItem) => {
+                                            const value = tooltipItem.raw;
+                                            return `Total Playtime: ${value}h`;
+                                          },
+                                        },
+                                      },
                                     },
                                   }}
                                 />
@@ -548,7 +581,7 @@ const SessionModal = ({
                                 <div className="card-body d-flex flex-column">
                                   <h5 className="card-title d-flex justify-content-between mb-0">
                                     <span>{formattedDate}</span>
-                                    <Tippy
+                                    {/* <Tippy
                                       content="Delete this session"
                                       placement="top"
                                       className="custom-tooltip"
@@ -562,7 +595,7 @@ const SessionModal = ({
                                       >
                                         <i className="bi bi-trash2-fill"></i>
                                       </button>
-                                    </Tippy>
+                                    </Tippy> */}
                                   </h5>
                                   {session.realmlist && (
                                     <small className="text-muted fw-medium">
@@ -570,7 +603,7 @@ const SessionModal = ({
                                     </small>
                                   )}
                                   <h2 className="mt-3 mb-1">
-                                    {session.durationMinutes} min
+                                    {formatDuration(session.durationMinutes)}
                                   </h2>
                                   <small className="text-muted">
                                     ({sessionStart} - {sessionEnd})

@@ -34,6 +34,7 @@ const AddonSelectionModal = lazy(() =>
 const ReportModal = lazy(() => import("../components/Modals/ReportModal.js"));
 const ExportModal = lazy(() => import("../components/Modals/ExportModal.js"));
 const ImportModal = lazy(() => import("../components/Modals/ImportModal.js"));
+import DeleteConfirmationModal from "../components/Modals/DeleteConfirmationModal.js";
 const AddonModal = lazy(() => import("../components/Modals/AddonModal.js"));
 
 // Addon Cards
@@ -47,8 +48,10 @@ const AddonsPage = ({
     gamePath,
     activeTab,
     setActiveTab,
+    serverId
 }) => {
     const [allAddons, setAllAddons] = useState([]);
+    const [expandedAddons, setExpandedAddons] = useState([]);
     const [addons, setAddons] = useState([]);
     const [authors, setAuthors] = useState({});
     const [gameDir, setGameDir] = useState(null);
@@ -105,6 +108,14 @@ const AddonsPage = ({
     const [showExportModal, setShowExportModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
 
+    // Addon Delete Confirmation For Bundles
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deleteModalData, setDeleteModalData] = useState({
+        addon: null,
+        parents: [],
+        children: []
+    });
+
     // Toast notifications state
     const [toasts, setToasts] = useState([]);
 
@@ -130,6 +141,16 @@ const AddonsPage = ({
     const [installingAddonStep, setInstallingAddonStep] = useState(null);
     const [progress, setProgress] = useState(0);
 
+    // Toggle the accordion open/close for a given addon ID.
+    function toggleAddonExpansion(addonId) {
+        setExpandedAddons((prev) => {
+            if (prev.includes(addonId)) {
+                return prev.filter((id) => id !== addonId);
+            } else {
+                return [...prev, addonId];
+            }
+        });
+    }
 
     // Utility function to check if a path is inside a directory
     const isPathInsideDirectory = (childPath, parentPath) => {
@@ -378,7 +399,7 @@ const AddonsPage = ({
             : creatorName || "N/A";
 
         if (hideImage && (authorName === "Unknown" || authorName === "N/A")) {
-            return <span>Unknown author</span>;
+            return <span>Unknown</span>;
         }
 
         if (hideImage) {
@@ -495,6 +516,95 @@ const AddonsPage = ({
         setSelectedAddon(null);
     };
 
+    /**
+    * Finds all parent addons that contain the child's main folder in their folder_list.
+    *
+    * @param {object} childAddon - The installed addon whose parents we're finding.
+    * @param {object} installedAddons - The full installedAddons object keyed by folder name.
+    * @return {Array} Array of parent addons (each item is an addon object).
+    */
+    function findParentAddons(childAddon, installedAddons) {
+        if (!childAddon?.custom_fields?.folder_list) return [];
+
+        // Identify the child's main folder
+        const mainFolderEntry = childAddon.custom_fields.folder_list.find(
+            ([_, isMain]) => isMain === "1"
+        );
+        if (!mainFolderEntry) {
+            return [];
+        }
+        const [childMainFolderName] = mainFolderEntry;
+
+        // Check all installed addons to see if they contain that folder (and aren't the same addon)
+        const parents = [];
+        for (const key in installedAddons) {
+            const possibleParent = installedAddons[key];
+            if (!possibleParent?.custom_fields?.folder_list) continue;
+            if (possibleParent.id === childAddon.id) continue; // exclude itself
+            const hasChildFolder = possibleParent.custom_fields.folder_list.some(
+                ([f]) => f === childMainFolderName
+            );
+            if (hasChildFolder) {
+                parents.push(possibleParent);
+            }
+        }
+        return parents;
+    }
+
+    /**
+    * For a given "parent" addon, find all installed "child" addons that are
+    * physically included in the parent's folder_list. 
+    * 
+    * The parent's folder_list might have multiple subfolders. Any installed
+    * addon whose "main folder" is in that list is considered a "child".
+    */
+    function findChildAddons(parentAddon, installedAddons) {
+        if (!parentAddon?.custom_fields?.folder_list) return [];
+
+        // Gather all folder names from the parent's folder_list
+        const parentFolders = parentAddon.custom_fields.folder_list.map(([f]) => f);
+
+        // Then check each installed addon to see if that addon's main folder is in the parent's folder_list
+        const children = [];
+        for (const key in installedAddons) {
+            const candidate = installedAddons[key];
+            if (candidate.id === parentAddon.id) continue; // skip itself
+            const mainFolderEntry = candidate.custom_fields?.folder_list?.find(
+                ([_, isMain]) => isMain === "1"
+            );
+            if (!mainFolderEntry) continue;
+            const [childMainFolder] = mainFolderEntry;
+
+            // If the parent's folder list includes this child's main folder, we consider it a child
+            if (parentFolders.includes(childMainFolder)) {
+                children.push(candidate);
+            }
+        }
+        return children;
+    }
+
+    /**
+    * Recursively gather all sub-addons (direct and nested) under a given addon.
+    * @param {object} parentAddon
+    * @param {object} installedAddons
+    * @returns {Set} a set of all nested addons
+    */
+    function gatherAllSubAddons(parentAddon, installedAddons) {
+        const result = new Set();
+        function recurse(currentAddon) {
+            // Find immediate children:
+            const children = findChildAddons(currentAddon, installedAddons);
+            for (const child of children) {
+                if (!result.has(child)) {
+                    result.add(child);
+                    recurse(child); // go deeper
+                }
+            }
+        }
+        recurse(parentAddon);
+        return result;
+    }
+
     // Decode HTML entities in a string
     const decodeHtmlEntities = (text) => {
         const textArea = document.createElement("textarea");
@@ -532,9 +642,12 @@ const AddonsPage = ({
         return normalizedTitle;
     };
 
-    const handleInstallAddon = async (addon, event, isReinstall = false) => {
+    const handleInstallAddon = async (addon, event, isReinstall = false, skipBundledCheck = false) => {
         event.preventDefault();
         event.stopPropagation();
+
+        setShowDeleteModal(false);
+        setDeleteModalData({ addon: null, parents: [], children: [] });
 
         if (!gameDir) {
             showToastMessage(
@@ -570,35 +683,99 @@ const AddonsPage = ({
             return;
         }
 
+        let modalShown = false;
+
+        // Auto-skip bundled check for reinstalls
+        if (isReinstall) {
+            skipBundledCheck = true;
+        }
+
         try {
             setDownloading(true);
             setInstallingAddonId(addon.id);
             setInstallingAddonStep("Deleting previous folders");
 
             // Step 1: Handle Variations
-            let relatedAddons = [];
+
             let mainAddon = addon;
             const isVariation = addon.custom_fields.variation;
 
-            if (isVariation) {
-                // Fetch main addon details
+            if (isVariation && isVariation !== "0") {
+                // Fetch main addon if installing a variation
                 const mainAddonResponse = await axios.get(
                     `${WEB_URL}/wp-json/wp/v2/${currentExpansion}-addons/${isVariation}`
                 );
                 mainAddon = mainAddonResponse.data;
-
-                const hasVariations = mainAddon.custom_fields?.has_variations || "";
-                if (hasVariations) {
-                    relatedAddons = parseSerializedPHPArray(hasVariations);
-                }
-            } else {
-                // If installing a main addon, fetch its related variations if they exist
-                relatedAddons = parseSerializedPHPArray(
-                    addon.custom_fields.has_variations
-                );
             }
 
-            // Step 2: Delete previous addon folders (including all related variations and main addon)
+            // Get variations from the MAIN addon
+            const hasVariations = mainAddon.custom_fields?.has_variations || [];
+            const relatedAddons = parseSerializedPHPArray(hasVariations);
+
+            // Check if the main addon or any of its variations have bundled addons
+            // const allAddonsToCheck = [mainAddon, ...relatedAddons.map(id => allAddons.find(a => a.id === id))];
+            const currentlyInstalledAddon = Object.values(installedAddons).find(
+                (installed) => {
+                    // Check if the installed addon is the main addon or one of its variations
+                    return (
+                        installed.id === mainAddon.id ||
+                        relatedAddons.includes(installed.id)
+                    );
+                }
+            );
+            //Skip bundled check if flag is true
+            if (!skipBundledCheck) {
+                // Check if main addon/variations have bundled addons
+                const allAddonsToCheck = [mainAddon, ...relatedAddons.map(id => allAddons.find(a => a.id === id))];
+                const bundledAddons = allAddonsToCheck.flatMap(parentAddon => {
+                    return findChildAddons(parentAddon, installedAddons).filter(child => {
+                        // Only consider children that are EXCLUSIVE to this parent
+                        const childParents = findParentAddons(child, installedAddons);
+                        return childParents.some(p => p.id === parentAddon.id);
+                    });
+                });
+
+                const findStandaloneCopies = (mainAddon, installedAddons) => {
+                    // Get main addon's root parent
+                    const getRootParent = (addon) => {
+                        if (addon.custom_fields?.variation && addon.custom_fields.variation !== "0") {
+                            const parent = allAddons.find(a => a.id === parseInt(addon.custom_fields.variation));
+                            return parent ? getRootParent(parent) : addon;
+                        }
+                        return addon;
+                    };
+
+                    const mainRoot = getRootParent(mainAddon);
+
+                    return [...new Set(
+                        Object.values(installedAddons).filter(installed => {
+                            const installedRoot = getRootParent(installed);
+                            return installedRoot.id !== mainRoot.id &&
+                                installed.custom_fields.folder_list.some(([f]) =>
+                                    mainAddon.custom_fields.folder_list.some(([mf]) => mf === f)
+                                );
+                        })
+                    )];
+                };
+
+                if (bundledAddons.length > 0 && !skipBundledCheck) {
+                    // Show deletion modal
+                    setDeleteModalData({
+                        addon: currentlyInstalledAddon,
+                        newAddon: mainAddon,
+                        parents: [],
+                        children: bundledAddons,
+                        isInstallation: true,
+                        standaloneAddons: findStandaloneCopies(mainAddon, installedAddons)
+                    });
+                    setShowDeleteModal(true);
+                    setShowModal(false);
+                    return;
+                }
+
+            }
+
+            // Delete folders from main addon + all variations
             const addonsToDelete = [mainAddon.id, ...relatedAddons];
 
             await Promise.all(
@@ -615,10 +792,33 @@ const AddonsPage = ({
 
                         await Promise.all(
                             foldersToDelete.map(async (folder) => {
-                                const folderPath = window.electron.pathJoin(
-                                    installPath,
-                                    folder
+                                const folderPath = window.electron.pathJoin(installPath, folder);
+
+                                // Get ALL installed addons using this folder
+                                const folderUsers = Object.values(installedAddons).filter(installed =>
+                                    installed.custom_fields.folder_list.some(([f]) => f === folder)
                                 );
+
+                                const isSameFamily = folderUsers.some(installed => {
+                                    // Recursive family check
+                                    const getRootParent = (addon) => {
+                                        if (addon.custom_fields?.variation && addon.custom_fields.variation !== "0") {
+                                            const parent = allAddons.find(a => a.id === parseInt(addon.custom_fields.variation));
+                                            return parent ? getRootParent(parent) : addon;
+                                        }
+                                        return addon;
+                                    };
+
+                                    const installedRoot = getRootParent(installed);
+                                    const mainAddonRoot = getRootParent(mainAddon);
+
+                                    return installedRoot.id === mainAddonRoot.id;
+                                });
+
+                                if (!isSameFamily) {
+                                    console.log(`Preserving unrelated folder: ${folder}`);
+                                    return; // Skip deletion
+                                }
 
                                 // Validate folderPath
                                 if (!isPathInsideDirectory(folderPath, installPath)) {
@@ -628,6 +828,16 @@ const AddonsPage = ({
                                     );
                                     showToastMessage("Invalid folder path.", "danger");
                                     return;
+                                }
+
+                                // Check if folder is used by other installed addons
+                                const isFolderUsed = Object.values(installedAddons).some(ia =>
+                                    ia.id !== installedAddon.id &&
+                                    ia.custom_fields.folder_list.some(([f]) => f === folder)
+                                );
+                                if (isFolderUsed) {
+                                    console.log(`Skipping ${folder} (used by another addon)`);
+                                    return; // Skip deletion
                                 }
 
                                 // Attempt to delete the folder and confirm deletion
@@ -708,7 +918,7 @@ const AddonsPage = ({
                 const warperiaContent = `ID: ${addon.id
                     }\nFolders: ${addon.custom_fields.folder_list
                         .map(([folderName]) => folderName)
-                        .join(",")}`;
+                        .join(",")}\nFilename: ${addonUrl.split("/").pop()}`;
                 await window.electron.writeFile(warperiaFilePath, warperiaContent);
 
                 // Immediately read back the file to confirm content
@@ -726,10 +936,6 @@ const AddonsPage = ({
                 const backendVersion = addon.custom_fields.version || versionFromToc;
                 await window.electron.updateTocVersion(mainFolderPath, backendVersion);
 
-                showToastMessage(
-                    `"${addon.title}" installed successfully with version ${backendVersion}.`,
-                    "success"
-                );
             } else {
                 console.warn(
                     `No .toc file found in main folder "${mainFolderName}", defaulting to version 1.0.0.`
@@ -742,60 +948,45 @@ const AddonsPage = ({
             console.error("Error installing addon:", error);
             showToastMessage(`Failed to install "${addon.title}".`, "danger");
         } finally {
-            setTimeout(() => {
-                setDownloading(false);
-                setProgress(0);
-                setInstallingAddonId(null);
-            }, 1500);
+            if (!modalShown) {
+                setTimeout(() => {
+                    setDownloading(false);
+                    setProgress(0);
+                    setInstallingAddonId(null);
+                }, 1500);
+            }
         }
     };
-
-    // Create a mapping of folder names to addons for quick lookup
-    const folderNameToAddons = useMemo(() => {
-        const map = new Map();
-        allAddons.forEach((addon) => {
-            addon.custom_fields.folder_list.forEach(([folderName]) => {
-                if (!map.has(folderName)) {
-                    map.set(folderName, []);
-                }
-                map.get(folderName).push(addon);
-            });
-        });
-        return map;
-    }, [allAddons]);
 
     const checkInstalledAddons = async (gamePath) => {
         try {
             setScanningAddons(true);
 
+            // 1) Normalize the path to Interface/AddOns
             const absoluteGameDir = window.electron.pathResolve(gamePath);
-            const addonsDir = window.electron.pathJoin(
-                absoluteGameDir,
-                "Interface",
-                "AddOns"
-            );
+            const addonsDir = window.electron.pathJoin(absoluteGameDir, "Interface", "AddOns");
 
-            // Validate addonsDir
+            // 2) Validate that the addonsDir is inside the gameDir
             if (!isPathInsideDirectory(addonsDir, absoluteGameDir)) {
-                console.error("Invalid AddOns directory:", addonsDir);
+                console.error("Invalid game directory:", addonsDir);
                 showToastMessage("Invalid game directory.", "danger");
                 return;
             }
 
+            // 3) Get all top-level folders in the AddOns directory
             const addonFolders = await window.electron.readDir(addonsDir);
 
-            // Use cached addons or fetch them if not already fetched
+            // 4) Make sure we have the full list of allAddons; if not, fetch them in batches
             let fetchedAddons = allAddons;
             if (!fetchedAddons || fetchedAddons.length === 0) {
                 let currentPage = 1;
                 const pageSize = 100;
                 let totalPages = 1;
 
-                // Fetch all addons from the backend in batches
                 do {
                     const { data: batchAddons, totalPages: fetchedTotalPages } =
                         await fetchAddons(
-                            `${currentExpansion}`,
+                            `${currentExpansion}`, // Post type or expansion
                             currentPage,
                             "",
                             [],
@@ -806,167 +997,175 @@ const AddonsPage = ({
                     currentPage++;
                 } while (currentPage <= totalPages);
 
-                // Cache the fetched addons
                 setAllAddons(fetchedAddons);
             }
 
-            // Create a mapping from folder names to addons
+            if (fetchedAddons.length === 0) {
+                let currentPage = 1;
+                const pageSize = 100;
+                let totalPages = 1;
+                do {
+                    const { data: batchAddons, totalPages: fetchedTotalPages } = await fetchAddons(
+                        `${currentExpansion}`,
+                        currentPage,
+                        "",
+                        [],
+                        pageSize
+                    );
+                    fetchedAddons = [...fetchedAddons, ...batchAddons];
+                    totalPages = fetchedTotalPages || 1;
+                    currentPage++;
+                } while (currentPage <= totalPages);
+                setAllAddons(fetchedAddons);
+            }
+
+            /*
+             * 5) Create a mapping from MAIN folders to addons ONLY.
+             * This prevents subfolders from incorrectly matching another addon
+             */
             const folderNameToAddons = {};
             fetchedAddons.forEach((addon) => {
                 if (addon.custom_fields && addon.custom_fields.folder_list) {
-                    addon.custom_fields.folder_list.forEach(([folderName]) => {
-                        if (!folderNameToAddons[folderName]) {
-                            folderNameToAddons[folderName] = [];
+                    addon.custom_fields.folder_list.forEach(([folderName, isMain]) => {
+                        if (isMain === "1") {
+                            if (!folderNameToAddons[folderName]) {
+                                folderNameToAddons[folderName] = [];
+                            }
+                            folderNameToAddons[folderName].push(addon);
                         }
-                        folderNameToAddons[folderName].push(addon);
                     });
                 }
             });
 
+            /*
+             * We'll store discovered addons in matchedAddons,
+             * plus any conflicts in modalQueueTemp for AddonSelectionModal.
+             */
             const matchedAddons = {};
-            let modalQueueTemp = []; // Temporary queue for conflicts
+            let modalQueueTemp = [];
 
-            // Process each folder in the user's AddOns directory
+            // 6) Iterate over each folder in the user’s AddOns directory
             await Promise.all(
                 addonFolders.map(async (folder) => {
-                    const folderPath = window.electron.normalizePath(
-                        `${gamePath}\\Interface\\AddOns\\${folder}`
-                    );
+                    const folderPath = window.electron.pathJoin(addonsDir, folder);
 
-                    // Find addons in the backend that include this folder in their folder_list
+                    // Skip if no addon claims this folder as its main folder
                     const matchingAddons = folderNameToAddons[folder] || [];
-
                     if (matchingAddons.length === 0) {
                         return;
                     }
 
-                    // Check if the folder contains a .toc file and extract the version
-                    const tocFile = `${folderPath}\\${folder}.toc`;
-                    let tocVersion = "1.0.0"; // Default version if missing
+                    // Read version from .toc if it exists
+                    const tocFile = window.electron.pathJoin(folderPath, `${folder}.toc`);
+                    let tocVersion = "1.0.0";
                     if (await window.electron.fileExists(tocFile)) {
-                        const versionFromToc = await window.electron.readVersionFromToc(
-                            tocFile
-                        );
+                        const versionFromToc = await window.electron.readVersionFromToc(tocFile);
                         tocVersion = versionFromToc || tocVersion;
                     }
 
-                    // Get the main folder for all matching addons
-                    const mainFolders = matchingAddons.map(
-                        (addon) =>
-                            addon.custom_fields.folder_list.find(
-                                ([_, isMain]) => isMain === "1"
-                            )?.[0]
-                    );
+                    // Check for .warperia file to see if we can identify which exact addon ID was installed
+                    const warperiaFile = window.electron.pathJoin(folderPath, `${folder}.warperia`);
+                    const warperiaExists = await window.electron.fileExists(warperiaFile);
 
-                    if (mainFolders.includes(folder)) {
-                        // If this is the main folder, check for .warperia file in this folder
-                        const warperiaFile = `${folderPath}\\${folder}.warperia`;
+                    // Create the .warperia file if it doesn't exist
+                    if (!warperiaExists && matchingAddons.length === 1) {
+                        const matchedAddon = matchingAddons[0];
+                        try {
+                            const warperiaContent = `ID: ${matchedAddon.id}\nFolders: ${matchedAddon.custom_fields.folder_list
+                                .map(([f]) => f)
+                                .join(",")
+                                }\nFilename: ${matchedAddon.custom_fields.file.split("/").pop()}`;
 
-                        if (await window.electron.fileExists(warperiaFile)) {
-                            const warperiaContent = await window.electron.readFile(
-                                warperiaFile
-                            );
-                            const installedAddonId =
-                                warperiaContent.match(/ID:\s*(\d+)/)?.[1];
-
-                            if (installedAddonId) {
-                                const matchedAddon = fetchedAddons.find(
-                                    (addon) => addon.id === parseInt(installedAddonId, 10)
-                                );
-
-                                if (matchedAddon) {
-                                    // Check for missing folders
-                                    const allAddonFolders =
-                                        matchedAddon.custom_fields.folder_list.map(
-                                            ([relatedFolder]) => relatedFolder
-                                        );
-                                    const missingFolders = allAddonFolders.filter(
-                                        (folderName) => !addonFolders.includes(folderName)
-                                    );
-
-                                    matchedAddons[folder] = {
-                                        ...matchedAddon,
-                                        corrupted: missingFolders.length > 0, // Set corrupted if any folders are missing
-                                        missingFolders,
-                                        localVersion: tocVersion, // Store the local version from the .toc file
-                                    };
-
-                                    return;
-                                }
-                            }
-                        }
-
-                        if (matchingAddons.length === 1) {
-                            // Only one matching addon; process it directly
-                            const matchedAddon = matchingAddons[0];
-
-                            // Check for missing folders
-                            const allAddonFolders =
-                                matchedAddon.custom_fields.folder_list.map(
-                                    ([relatedFolder]) => relatedFolder
-                                );
-                            const missingFolders = allAddonFolders.filter(
-                                (folderName) => !addonFolders.includes(folderName)
-                            );
-
-                            matchedAddons[folder] = {
-                                ...matchedAddon,
-                                corrupted: missingFolders.length > 0,
-                                missingFolders,
-                                localVersion: tocVersion,
-                            };
-
-                            return;
-                        }
-
-                        // If multiple matching addons, check if they have variations
-                        const hasVariations = matchingAddons.some(
-                            (addon) =>
-                                Array.isArray(addon.custom_fields?.has_variations) &&
-                                addon.custom_fields.has_variations.length > 0
-                        );
-                        const isVariation = matchingAddons.some(
-                            (addon) =>
-                                addon.custom_fields?.variation &&
-                                addon.custom_fields.variation !== "0" &&
-                                addon.custom_fields.variation !== ""
-                        );
-
-                        if (hasVariations || isVariation) {
-                            // Add to modal queue if the addons have variations or are variations
-                            modalQueueTemp.push(matchingAddons);
-                        } else {
-                            // If no variations, assume the first addon is correct
-                            const matchedAddon = matchingAddons[0];
-
-                            // Check for missing folders
-                            const allAddonFolders =
-                                matchedAddon.custom_fields.folder_list.map(
-                                    ([relatedFolder]) => relatedFolder
-                                );
-                            const missingFolders = allAddonFolders.filter(
-                                (folderName) => !addonFolders.includes(folderName)
-                            );
-
-                            matchedAddons[folder] = {
-                                ...matchedAddon,
-                                corrupted: missingFolders.length > 0,
-                                missingFolders,
-                                localVersion: tocVersion,
-                            };
+                            await window.electron.writeFile(warperiaFile, warperiaContent);
+                        } catch (error) {
+                            console.error(`Failed to create .warperia file for ${folder}:`, error);
                         }
                     }
+
+                    let storedFilename = "";
+
+                    if (await window.electron.fileExists(warperiaFile)) {
+                        const warperiaContent = await window.electron.readFile(warperiaFile);
+                        const installedAddonId = warperiaContent.match(/ID:\s*(\d+)/)?.[1];
+                        const filenameMatch = warperiaContent.match(/Filename:\s*(.+)/);
+                        if (filenameMatch) {
+                            storedFilename = filenameMatch[1];
+                        }
+
+                        if (!filenameMatch) {
+                            const matchedAddon = fetchedAddons.find(
+                                (a) => a.id === parseInt(installedAddonId, 10)
+                            );
+                            if (matchedAddon) {
+                                const addonUrl = matchedAddon.custom_fields.file;
+                                const newFilename = addonUrl.split("/").pop();
+                                const newWarperiaContent = `${warperiaContent}\nFilename: ${newFilename}`;
+
+                                await window.electron.overwriteFile(warperiaFile, newWarperiaContent);
+                                storedFilename = newFilename;
+                            }
+                        } else {
+                            storedFilename = filenameMatch[1];
+                        }
+
+                        if (installedAddonId) {
+                            const matchedAddon = fetchedAddons.find(
+                                (a) => a.id === parseInt(installedAddonId, 10)
+                            );
+                            if (matchedAddon) {
+                                // Check if any subfolders are missing (corruption check)
+                                const allAddonFolders =
+                                    matchedAddon.custom_fields.folder_list.map(([f]) => f);
+                                const missingFolders = allAddonFolders.filter(
+                                    (sub) => !addonFolders.includes(sub)
+                                );
+
+                                matchedAddons[folder] = {
+                                    ...matchedAddon,
+                                    corrupted: missingFolders.length > 0,
+                                    missingFolders,
+                                    localVersion: tocVersion,
+                                    storedFilename,
+                                };
+                                return; // Done with this folder
+                            }
+                        }
+                    }
+
+                    // If there's exactly one matching addon, no conflict
+                    if (matchingAddons.length === 1) {
+                        const matchedAddon = matchingAddons[0];
+                        const allAddonFolders =
+                            matchedAddon.custom_fields.folder_list.map(([f]) => f);
+                        const missingFolders = allAddonFolders.filter(
+                            (sub) => !addonFolders.includes(sub)
+                        );
+
+                        matchedAddons[folder] = {
+                            ...matchedAddon,
+                            corrupted: missingFolders.length > 0,
+                            missingFolders,
+                            localVersion: tocVersion,
+                            storedFilename,
+                        };
+                        return;
+                    }
+
+                    // Otherwise, multiple main folder claims
+                    modalQueueTemp.push(matchingAddons);
                 })
             );
 
-            // If conflicts exist, set the modal queue and trigger the first modal
+            // 7) If conflicts were found, open the addon selection modal
             if (modalQueueTemp.length > 0) {
                 setModalQueue(modalQueueTemp);
                 setCurrentModalData(modalQueueTemp[0]);
                 setShowAddonSelectionModal(true);
             }
 
+            // 8) Update our state for all installed addons we confidently matched
             setInstalledAddons({ ...matchedAddons });
+
         } catch (error) {
             console.error("Error checking installed addons:", error);
         } finally {
@@ -1093,84 +1292,231 @@ const AddonsPage = ({
     };
 
     const handleDeleteAddon = async () => {
-        if (contextMenu.addon) {
-            try {
-                const folderList = contextMenu.addon.custom_fields.folder_list || [];
-                const addonFolders = await window.electron.readDir(
-                    `${gameDir}\\Interface\\AddOns`
+        if (!contextMenu.addon) return;
+
+        const mainAddon = contextMenu.addon;
+
+        // Gather parents and sub-addons
+        const parents = findParentAddons(mainAddon, installedAddons);
+        const allSubAddons = gatherAllSubAddons(mainAddon, installedAddons);
+        const nestedAddonsArray = Array.from(allSubAddons);
+
+        // If there are parents or nested sub-addons, show the modal and RETURN
+        if (parents.length > 0 || nestedAddonsArray.length > 0) {
+            setDeleteModalData({
+                addon: mainAddon,
+                parents,
+                children: nestedAddonsArray
+            });
+            setShowDeleteModal(true);
+            return;
+        }
+
+        // If no parents or nested sub-addons, proceed with direct deletion
+        try {
+            const folderList = contextMenu.addon.custom_fields.folder_list || [];
+            const addonFolders = await window.electron.readDir(
+                `${gameDir}\\Interface\\AddOns`
+            );
+            const normalizedTitle = normalizeTitle(
+                contextMenu.addon.custom_fields.title_toc ||
+                contextMenu.addon.title ||
+                ""
+            );
+
+            let foldersToDelete = [];
+
+            for (let folder of addonFolders) {
+                const tocFile = `${gameDir}\\Interface\\AddOns\\${folder}\\${folder}.toc`;
+
+                if (await window.electron.fileExists(tocFile)) {
+                    const title = await window.electron.readTitleFromToc(tocFile);
+                    const normalizedFolderTitle = normalizeTitle(title || folder);
+
+                    if (normalizedFolderTitle === normalizedTitle) {
+                        foldersToDelete.push(folder);
+                    }
+                }
+            }
+
+            // Include any folders from the addon’s folder_list
+            folderList.forEach(([relatedFolder]) => {
+                if (
+                    !foldersToDelete.includes(relatedFolder) &&
+                    addonFolders.includes(relatedFolder)
+                ) {
+                    foldersToDelete.push(relatedFolder);
+                }
+            });
+
+            if (foldersToDelete.length > 0) {
+                for (const folder of foldersToDelete) {
+                    const addonFolder = `${gameDir}\\Interface\\AddOns\\${folder}`;
+                    await window.electron.deleteFolder(addonFolder);
+                }
+
+                showToastMessage(
+                    `"${decodeHtmlEntities(
+                        contextMenu.addon.title
+                    )}" and related folders deleted successfully.`,
+                    "success"
                 );
+                await checkInstalledAddons(gameDir);
+                await updateAddonUninstallStats(
+                    contextMenu.addon.id,
+                    contextMenu.addon.post_type
+                );
+            } else {
+                showToastMessage(
+                    `Failed to find folders for "${decodeHtmlEntities(
+                        contextMenu.addon.title
+                    )}".`,
+                    "danger"
+                );
+            }
+        } catch (error) {
+            console.error("Error deleting addon:", error);
+            showToastMessage(
+                `Failed to delete "${decodeHtmlEntities(contextMenu.addon.title)}".`,
+                "danger"
+            );
+        }
+    };
+
+    // Confirm addon deletion for bundles (dependencies)
+    async function confirmDeleteAddons(selectedSubAddonIds) {
+        const originalAddonId = installingAddonId;
+        const mainAddon = deleteModalData.addon;
+        const targetAddon = deleteModalData.newAddon;
+        if (!mainAddon) return;
+
+        // Reset state immediately before installation
+        setDownloading(false);
+        setProgress(0);
+        setInstallingAddonId(null);
+        setShowDeleteModal(false);
+
+        if (targetAddon) {
+            await handleInstallAddon(targetAddon, new Event("click"), true, true);
+        }
+
+        if (originalAddonId) {
+            const addonToInstall = allAddons.find(a => a.id === originalAddonId);
+            if (addonToInstall) {
+                await handleInstallAddon(addonToInstall, new Event("click"), true, true);
+            }
+        }
+
+        try {
+            // Get target variation from modal data
+            const targetVariation = deleteModalData.newAddon;
+
+            // Install the new variation AFTER confirmation
+            if (targetVariation) {
+                await handleInstallAddon(targetVariation, new Event("click"), true, true);
+            }
+
+            // Build the set of addon IDs we are actually deleting
+            const allToDelete = new Set([mainAddon.id, ...selectedSubAddonIds]);
+
+            // Which installedAddons match that set?
+            const addonsToDelete = Object.values(installedAddons).filter(
+                (a) => allToDelete.has(a.id)
+            );
+
+            // Get quick access to all installed addons by their main folder
+            // so we can detect if we're about to remove the main folder of an addon the user wants to keep
+            const mainFolderMap = {};
+            for (const candidate of Object.values(installedAddons)) {
+                // Each installed addon might have a main folder
+                const mainFolderEntry = candidate.custom_fields?.folder_list?.find(
+                    ([_, isMain]) => isMain === "1"
+                );
+                if (mainFolderEntry) {
+                    const [candidateMainFolder] = mainFolderEntry;
+                    mainFolderMap[candidateMainFolder] = candidate.id;
+                }
+            }
+
+            // Read all current folders once
+            const addonFolders = await window.electron.readDir(`${gameDir}\\Interface\\AddOns`);
+
+            // For each addon we *are* deleting, remove its matching folders
+            for (const ad of addonsToDelete) {
+                const folderList = ad.custom_fields.folder_list || [];
                 const normalizedTitle = normalizeTitle(
-                    contextMenu.addon.custom_fields.title_toc ||
-                    contextMenu.addon.title ||
-                    ""
+                    ad.custom_fields.title_toc || ad.title || ""
                 );
 
                 let foldersToDelete = [];
 
-                for (let folder of addonFolders) {
+                // Attempt to match by .toc name
+                for (const folder of addonFolders) {
                     const tocFile = `${gameDir}\\Interface\\AddOns\\${folder}\\${folder}.toc`;
-
                     if (await window.electron.fileExists(tocFile)) {
                         const title = await window.electron.readTitleFromToc(tocFile);
                         const normalizedFolderTitle = normalizeTitle(title || folder);
-
                         if (normalizedFolderTitle === normalizedTitle) {
                             foldersToDelete.push(folder);
                         }
                     }
                 }
 
-                // Include any folders from the addon’s folder_list
+                // Include any folders from the addon's folder_list
                 folderList.forEach(([relatedFolder]) => {
-                    if (
-                        !foldersToDelete.includes(relatedFolder) &&
-                        addonFolders.includes(relatedFolder)
-                    ) {
+                    if (!foldersToDelete.includes(relatedFolder) && addonFolders.includes(relatedFolder)) {
                         foldersToDelete.push(relatedFolder);
                     }
                 });
 
-                if (foldersToDelete.length > 0) {
-                    for (const folder of foldersToDelete) {
-                        const addonFolder = `${gameDir}\\Interface\\AddOns\\${folder}`;
-                        await window.electron.deleteFolder(addonFolder);
-                    }
+                // Before removing each folder, skip it if it’s the main folder of a sub‐addon the user *didn't* select for deletion
+                foldersToDelete = foldersToDelete.filter((folderName) => {
+                    const possibleSubAddonId = mainFolderMap[folderName];
+                    // If this folder is *not* someone's main folder, we can safely remove it
+                    if (!possibleSubAddonId) return true;
 
-                    showToastMessage(
-                        `"${decodeHtmlEntities(
-                            contextMenu.addon.title
-                        )}" and related folders deleted successfully.`,
-                        "success"
-                    );
-                    await checkInstalledAddons(gameDir);
-                    await updateAddonUninstallStats(
-                        contextMenu.addon.id,
-                        contextMenu.addon.post_type
-                    );
-                } else {
-                    showToastMessage(
-                        `Failed to find folders for "${decodeHtmlEntities(
-                            contextMenu.addon.title
-                        )}".`,
-                        "danger"
-                    );
+                    // If it *is* someone's main folder but that sub‐addon is also in allToDelete, it's OK to remove
+                    if (allToDelete.has(possibleSubAddonId)) return true;
+
+                    // Otherwise, skip removing this folder because that sub‐addon was kept
+                    return false;
+                });
+
+                // Actually remove them
+                for (const folderName of foldersToDelete) {
+                    const folderPath = `${gameDir}\\Interface\\AddOns\\${folderName}`;
+                    await window.electron.deleteFolder(folderPath);
                 }
-            } catch (error) {
-                console.error("Error deleting addon:", error);
-                showToastMessage(
-                    `Failed to delete "${decodeHtmlEntities(contextMenu.addon.title)}".`,
-                    "danger"
-                );
             }
+
+            showToastMessage(`Successfully deleted addon(s).`, "success");
+            await checkInstalledAddons(gameDir);
+
+            // If this was triggered during an installation, proceed with the installation
+            if (installingAddonId) {
+                const addonToInstall = allAddons.find(a => a.id === installingAddonId);
+                if (addonToInstall) {
+                    await handleInstallAddon(addonToInstall, new Event("click"), true, true);
+                }
+            }
+        } catch (error) {
+            console.error("Error deleting addon(s):", error);
+            showToastMessage("Failed to delete addon(s).", "danger");
         }
-    };
+    }
 
     // Unserialize the JSON code for the addon variations
-    const parseSerializedPHPArray = (serializedString) => {
+    const parseSerializedPHPArray = (serializedData) => {
+        if (!serializedData) return [];
+
+        // Handle direct arrays (common in REST API)
+        if (Array.isArray(serializedData)) return serializedData;
+
+        // Handle PHP-serialized strings (e.g., "a:1:{i:0;i:3268;}")
         const regex = /i:\d+;i:(\d+);/g;
         const matches = [];
         let match;
-        while ((match = regex.exec(serializedString)) !== null) {
+        while ((match = regex.exec(serializedData)) !== null) {
             matches.push(match[1]);
         }
         return matches;
@@ -1227,6 +1573,21 @@ const AddonsPage = ({
 
     const handleSwitchVariation = async (newVariation) => {
         if (!currentAddon) return;
+
+        const bundledAddons = findChildAddons(currentAddon, installedAddons);
+
+        if (bundledAddons.length > 0) {
+            // Show delete confirmation first
+            setDeleteModalData({
+                addon: currentAddon,
+                newAddon: newVariation, // Store target variation
+                parents: [],
+                children: bundledAddons,
+                isInstallation: true
+            });
+            setShowDeleteModal(true);
+            return; // Stop here until confirmation
+        }
 
         try {
             // Delete the currently installed folders
@@ -1292,6 +1653,7 @@ const AddonsPage = ({
             )[0];
             const mainFolderPath = `${installPath}\\${mainFolder}`;
             const tocFilePath = `${mainFolderPath}\\${mainFolder}.toc`;
+            const warperiaFilePath = `${mainFolderPath}\\${mainFolder}.warperia`;
 
             // Read the current version from the .toc file
             const currentVersion = await window.electron.readVersionFromToc(
@@ -1299,19 +1661,38 @@ const AddonsPage = ({
             );
             const backendVersion = addon.custom_fields.version || "1.0.0"; // Version from the backend
 
-            // Check if the versions differ
-            if (currentVersion !== backendVersion) {
+            // Read the .warperia file to get the stored filename
+            let storedFilename = "";
+            if (await window.electron.fileExists(warperiaFilePath)) {
+                const warperiaContent = await window.electron.readFile(warperiaFilePath);
+                const filenameMatch = warperiaContent.match(/Filename:\s*(.+)/);
+                if (filenameMatch) {
+                    storedFilename = filenameMatch[1];
+                }
+            }
+
+            // Get the current filename from the backend
+            const currentFilename = addon.custom_fields.file.split("/").pop();
+
+            // Check if the versions differ or if the filenames differ
+            if (currentVersion !== backendVersion || storedFilename !== currentFilename) {
                 // Update the version in the .toc file if necessary
                 await window.electron.updateTocVersion(mainFolderPath, backendVersion);
+
+                // Update the .warperia file with the new filename
+                const warperiaContent = `ID: ${addon.id}\nFolders: ${addon.custom_fields.folder_list
+                    .map(([folderName]) => folderName)
+                    .join(",")}\nFilename: ${currentFilename}`;
+                await window.electron.writeFile(warperiaFilePath, warperiaContent);
+
+                // Proceed with the usual addon update (reinstallation)
+                await handleInstallAddon(addon, new Event("click"), true); // Reinstall to update
             } else {
                 showToastMessage(
                     `The addon is already up-to-date: v${currentVersion}`,
                     "info"
                 );
             }
-
-            // Proceed with the usual addon update (reinstallation)
-            await handleInstallAddon(addon, new Event("click"), true); // Reinstall to update
         } catch (error) {
             console.error(`Error updating addon "${addon.title}":`, error);
             showToastMessage(`Failed to update "${addon.title}".`, "danger");
@@ -1322,9 +1703,13 @@ const AddonsPage = ({
         try {
             // Filter the addons that need updating
             const addonsToUpdate = Object.values(installedAddons).filter((addon) => {
-                const installedVersion = addon.localVersion || "1.0.0"; // Local .toc version
-                const backendVersion = addon.custom_fields.version || "1.0.0"; // Backend version
-                return installedVersion !== backendVersion; // Needs update
+                const installedVersion = addon.localVersion || "0.0.0"; // Local .toc version
+                const backendVersion = addon.custom_fields.version || "0.0.0"; // Backend version
+                const currentFilename = addon.custom_fields.file.split("/").pop();
+                const storedFilename = addon.storedFilename || "";
+
+                // Needs update if versions differ or filenames differ
+                return backendVersion !== installedVersion || storedFilename !== currentFilename;
             });
 
             if (addonsToUpdate.length === 0) {
@@ -1360,6 +1745,37 @@ const AddonsPage = ({
         }, 5000);
     }, []);
 
+    const handleOpenAddonFolder = async (addon, folderName) => {
+        try {
+            if (!gameDir) {
+                showToastMessage("Your game directory is not configured.", "danger");
+                return;
+            }
+
+            // Construct full path
+            const absoluteGameDir = window.electron.pathResolve(gameDir);
+            const folderPath = window.electron.pathJoin(
+                absoluteGameDir,
+                "Interface",
+                "AddOns",
+                folderName
+            );
+
+            // Simple security check to ensure it's inside AddOns folder
+            if (!isPathInsideDirectory(folderPath, absoluteGameDir)) {
+                showToastMessage("Invalid folder path.", "danger");
+                return;
+            }
+
+            // Invoke the IPC method in main.cjs to open the folder
+            await window.electron.ipcRenderer.invoke('open-directory', folderPath);
+
+        } catch (error) {
+            console.error('Error opening addon folder:', error);
+            showToastMessage("Failed to open folder.", "danger");
+        }
+    };
+
     const handleRightClick = (event, addon) => {
         event.preventDefault();
 
@@ -1384,11 +1800,8 @@ const AddonsPage = ({
             }
         );
 
-        // Extract addon image and name
-        const addonImage = addon.featured_image
-            ? addon.featured_image
-            : "public/default-image.jpg";
-        const addonName = addon.title;
+        // Grab folder list directly from the addon 
+        const folderList = addon?.custom_fields?.folder_list || [];
 
         setContextMenu({
             visible: true,
@@ -1396,8 +1809,9 @@ const AddonsPage = ({
             yPos: event.pageY,
             addon,
             isInstalled,
-            addonImage,
-            addonName,
+            addonImage: addon.featured_image ?? 'public/default-image.jpg',
+            addonName: addon.title,
+            folderList
         });
     };
 
@@ -1446,6 +1860,17 @@ const AddonsPage = ({
         } finally {
             setShowReportModal(false);
         }
+    };
+
+    // View addon on the website
+    const handleViewOnWarperia = (addon) => {
+        if (!addon) return;
+
+        // Construct the URL for the addon on the backend website
+        const addonUrl = `${addon.link}`;
+
+        // Open the URL in the default browser using window.open
+        window.open(addonUrl, '_blank');
     };
 
     useEffect(() => {
@@ -1501,9 +1926,11 @@ const AddonsPage = ({
             const bVersion = b.localVersion || "0.0.0";
             const aNeedsUpdate =
                 (a.custom_fields?.version && a.custom_fields.version !== aVersion) ||
+                (a.storedFilename && a.custom_fields?.file && a.storedFilename !== a.custom_fields.file.split("/").pop()) ||
                 a.corrupted;
             const bNeedsUpdate =
                 (b.custom_fields?.version && b.custom_fields.version !== bVersion) ||
+                (b.storedFilename && b.custom_fields?.file && b.storedFilename !== b.custom_fields.file.split("/").pop()) ||
                 b.corrupted;
 
             if (aNeedsUpdate && !bNeedsUpdate) return -1;
@@ -1529,7 +1956,7 @@ const AddonsPage = ({
         if (activeTab === "myAddons") {
             return (
                 <div className="table-responsive">
-                    <table className="table table-addons-installed align-middle">
+                    <table className="table table-addons-installed align-middle user-select-none mb-0">
                         <thead>
                             <tr>
                                 <th scope="col">Name</th>
@@ -1549,15 +1976,13 @@ const AddonsPage = ({
                             ) : (
                                 finalAddons.map((addon) => {
                                     const installedAddon =
-                                        Object.values(installedAddons).find(
-                                            (installed) => installed.id === addon.id
-                                        ) || addon;
+                                        Object.values(installedAddons).find((installed) => installed.id === addon.id) || addon;
                                     const installedVersion = installedAddon.localVersion || "N/A";
-                                    const backendVersion =
-                                        installedAddon.custom_fields?.version || "N/A";
+                                    const backendVersion = installedAddon.custom_fields?.version || "N/A";
                                     const needsUpdate =
-                                        backendVersion !== installedVersion &&
-                                        !installedAddon.corrupted;
+                                        (addon.custom_fields?.version && addon.custom_fields.version !== addon.localVersion) ||
+                                        (addon.storedFilename && addon.custom_fields?.file && addon.storedFilename !== addon.custom_fields.file.split("/").pop()) ||
+                                        addon.corrupted;
                                     const isCorrupted = installedAddon.corrupted;
                                     const addonImage = installedAddon.featured_image
                                         ? installedAddon.featured_image
@@ -1566,20 +1991,20 @@ const AddonsPage = ({
                                     const postType = installedAddon.post_type || currentExpansion;
                                     const gameVersion = postTypeVersionMap[postType] || postType;
 
+                                    // Figure out child addons
+                                    const childAddons = findChildAddons(installedAddon, installedAddons);
+                                    const isExpanded = expandedAddons.includes(installedAddon.id);
+
+                                    // Build statusContent
                                     let statusContent;
                                     if (isCorrupted) {
                                         statusContent = (
                                             <button
                                                 className="btn btn-primary"
-                                                onClick={(e) =>
-                                                    handleInstallAddon(installedAddon, e, true)
-                                                }
-                                                disabled={
-                                                    downloading && installingAddonId === installedAddon.id
-                                                }
+                                                onClick={(e) => handleInstallAddon(installedAddon, e, true)}
+                                                disabled={downloading && installingAddonId === installedAddon.id}
                                             >
-                                                {downloading &&
-                                                    installingAddonId === installedAddon.id ? (
+                                                {downloading && installingAddonId === installedAddon.id ? (
                                                     <>
                                                         <span
                                                             className="spinner-border spinner-border-sm me-1"
@@ -1597,15 +2022,10 @@ const AddonsPage = ({
                                         statusContent = (
                                             <button
                                                 className="btn btn-primary"
-                                                onClick={(e) =>
-                                                    handleInstallAddon(installedAddon, e, true)
-                                                }
-                                                disabled={
-                                                    downloading && installingAddonId === installedAddon.id
-                                                }
+                                                onClick={(e) => handleInstallAddon(installedAddon, e, true)}
+                                                disabled={downloading && installingAddonId === installedAddon.id}
                                             >
-                                                {downloading &&
-                                                    installingAddonId === installedAddon.id ? (
+                                                {downloading && installingAddonId === installedAddon.id ? (
                                                     <>
                                                         <span
                                                             className="spinner-border spinner-border-sm me-1"
@@ -1622,38 +2042,37 @@ const AddonsPage = ({
                                     } else {
                                         statusContent = (
                                             <span className="text-muted fw-medium">
-                                                <i className="bi bi-check-circle-fill text-success me-1"></i>{" "}
-                                                Updated
+                                                <i className="bi bi-check-circle-fill text-success me-1"></i> Updated
                                             </span>
                                         );
                                     }
 
                                     return (
-                                        <tr
-                                            key={installedAddon.id}
-                                            onContextMenu={(e) =>
-                                                handleRightClick(e, installedAddon)
-                                            }
-                                            onClick={() => handleViewAddon(installedAddon)}
-                                        >
-                                            <td>
-                                                <div className="d-flex align-items-center gap-3">
-                                                    <img
-                                                        src={addonImage}
-                                                        alt={installedAddon.title}
-                                                        className="img-fluid rounded"
-                                                        style={{
-                                                            width: "60px",
-                                                            height: "60px",
-                                                            objectFit: "cover",
-                                                        }}
-                                                    />
-                                                    <div>
-                                                        <div className="fw-medium">
-                                                            {decodeHtmlEntities(installedAddon.title)}
+                                        <React.Fragment key={installedAddon.id}>
+                                            {/* Primary row for the parent addon */}
+                                            <tr
+                                                onContextMenu={(e) => handleRightClick(e, installedAddon)}
+                                                onClick={() => handleViewAddon(installedAddon)}
+                                                style={{ cursor: "pointer" }}
+                                            >
+                                                <td>
+                                                    <div className="d-flex align-items-center gap-2">
+                                                        <img
+                                                            src={addonImage}
+                                                            alt={installedAddon.title}
+                                                            className="img-fluid rounded"
+                                                            style={{
+                                                                width: "60px",
+                                                                height: "60px",
+                                                                objectFit: "cover",
+                                                            }}
+                                                            onContextMenu={(e) => handleRightClick(e, installedAddon)}
+                                                        />
 
-                                                            {downloading &&
-                                                                installingAddonId === addon.id && (
+                                                        <div>
+                                                            <div className="fw-medium">
+                                                                {decodeHtmlEntities(installedAddon.title)}
+                                                                {downloading && installingAddonId === addon.id && (
                                                                     <div
                                                                         className="spinner-border spinner-addon-title ms-2 text-muted"
                                                                         role="status"
@@ -1661,44 +2080,125 @@ const AddonsPage = ({
                                                                         <span className="visually-hidden">Loading...</span>
                                                                     </div>
                                                                 )}
-                                                        </div>
-                                                        <div
-                                                            className="text-muted fw-medium"
-                                                            style={{ fontSize: "0.9rem" }}
-                                                        >
-                                                            {installedVersion}
-                                                            {((Array.isArray(addon.custom_fields?.has_variations) &&
-                                                                addon.custom_fields.has_variations.length > 0) ||
-                                                                (addon.custom_fields?.variation &&
-                                                                    addon.custom_fields.variation !== "" &&
-                                                                    addon.custom_fields.variation !== "0")) && (
-                                                                    <Tippy content="Switch Addon Variation" placement="top" className="custom-tooltip">
-                                                                        <div
-                                                                            className="btn btn-link"
+                                                                {/* Expand/Collapse caret, only if childAddons exist */}
+                                                                {childAddons.length > 0 && (
+                                                                    <Tippy
+                                                                        content="Show dependencies"
+                                                                        placement="auto"
+                                                                        className="custom-tooltip"
+                                                                    >
+                                                                        <i
+                                                                            className={`bi ${isExpanded ? "bi-chevron-up" : "bi-chevron-down"
+                                                                                } text-muted ms-2 accordion-button rounded`}
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                openSwitchVariationModal(addon);
+                                                                                toggleAddonExpansion(installedAddon.id);
                                                                             }}
-                                                                        >
-                                                                            <i className="bi bi-arrow-left-right text-primary me-1"></i> Switch
-                                                                        </div>
+                                                                        />
                                                                     </Tippy>
                                                                 )}
+                                                            </div>
+                                                            <div
+                                                                className="text-muted fw-medium"
+                                                                style={{ fontSize: "0.9rem" }}
+                                                            >
+                                                                {/* Variation switch UI if needed */}
+                                                                <Tippy
+                                                                    content="Installed version"
+                                                                    placement="auto"
+                                                                    className="custom-tooltip"
+                                                                >
+                                                                    <span>{installedVersion}</span>
+                                                                </Tippy>
+                                                                {((Array.isArray(addon.custom_fields?.has_variations) &&
+                                                                    addon.custom_fields.has_variations.length > 0) ||
+                                                                    (addon.custom_fields?.variation &&
+                                                                        addon.custom_fields.variation !== "" &&
+                                                                        addon.custom_fields.variation !== "0")) && (
+                                                                        <Tippy
+                                                                            content="Switch Addon Variation"
+                                                                            placement="top"
+                                                                            className="custom-tooltip"
+                                                                        >
+                                                                            <div
+                                                                                className="btn btn-link"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    openSwitchVariationModal(addon);
+                                                                                }}
+                                                                            >
+                                                                                <i className="bi bi-arrow-left-right text-primary me-1"></i>{" "}
+                                                                                Switch
+                                                                            </div>
+                                                                        </Tippy>
+                                                                    )}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            <td>{statusContent}</td>
-                                            <td className="text-muted fw-medium text-truncate">
-                                                {backendVersion}
-                                            </td>
-                                            <td className="text-muted fw-medium">
-                                                {gameVersion}
-                                            </td>
-                                            <td className="text-muted fw-medium">
-                                                {renderAddonAuthor(installedAddon, true)}
-                                            </td>
-                                        </tr>
+                                                </td>
+                                                <td>{statusContent}</td>
+                                                <td className="text-muted fw-medium text-truncate">
+                                                    {backendVersion}
+                                                </td>
+                                                <td className="text-muted fw-medium">{gameVersion}</td>
+                                                <td className="text-muted fw-medium">
+                                                    {renderAddonAuthor(installedAddon, true)}
+                                                </td>
+                                            </tr>
+
+                                            {/* Accordion row for child addons (sub‐addons) */}
+                                            {childAddons.length > 0 && isExpanded && (
+                                                <tr>
+                                                    <td colSpan={5} style={{ background: "#1b1b1b" }}>
+                                                        <div className="p-3">
+                                                            <div className="text-muted mb-2">
+                                                                <small>
+                                                                    The following addon(s) are bundled or dependencies of{" "}
+                                                                    <strong>{decodeHtmlEntities(installedAddon.title)}</strong>:
+                                                                </small>
+                                                            </div>
+                                                            {/* Render each child as a smaller "subrow" but keep the same columns for consistency */}
+                                                            <table className="table table-sm table-dark-subaddons mb-0">
+                                                                <tbody>
+                                                                    {childAddons.map((child) => {
+                                                                        const childImage = child.featured_image || "public/default-image.jpg";
+
+                                                                        return (
+                                                                            <tr
+                                                                                key={child.id}
+                                                                                style={{ cursor: "pointer" }}
+                                                                                onClick={() => handleViewAddon(child)}
+                                                                                onContextMenu={(e) => handleRightClick(e, child)}
+                                                                            >
+                                                                                <td>
+                                                                                    <div className="d-flex align-items-center gap-2">
+                                                                                        <img
+                                                                                            src={childImage}
+                                                                                            alt={child.title}
+                                                                                            className="img-fluid rounded"
+                                                                                            style={{
+                                                                                                width: "40px",
+                                                                                                height: "40px",
+                                                                                                objectFit: "cover",
+                                                                                            }}
+                                                                                        />
+                                                                                        <div>
+                                                                                            <div className="d-block" style={{ fontSize: "0.95rem" }}>
+                                                                                                {decodeHtmlEntities(child.title)}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </React.Fragment>
                                     );
                                 })
                             )}
@@ -1708,7 +2208,7 @@ const AddonsPage = ({
             );
         }
 
-        // For browse addons, unchanged
+        // Browse Addons
         return (
             <div
                 className={`row ${activeTab === "myAddons" ? "g-4" : "g-3 row-cols-md-1 row-cols-xl-1"
@@ -1764,7 +2264,7 @@ const AddonsPage = ({
                         role="tabpanel"
                         aria-labelledby="my-addons-tab"
                     >
-                        <div className="d-flex mb-3 sticky-top sticky-controls">
+                        <div className="d-flex mb-3 sticky-top sticky-controls pt-2">
                             <div className="w-100 d-flex flex-wrap align-items-center gap-2">
                                 <Tippy content="Update all addons" placement="auto">
                                     <span>
@@ -1772,10 +2272,15 @@ const AddonsPage = ({
                                             className="btn btn-primary"
                                             onClick={handleUpdateAllAddons}
                                             disabled={
-                                                Object.values(installedAddons).filter(
-                                                    (addon) =>
-                                                        addon.localVersion !== addon.custom_fields.version
-                                                ).length === 0 || downloading
+                                                Object.values(installedAddons).filter((addon) => {
+                                                    const installedVersion = addon.localVersion || "0.0.0";
+                                                    const backendVersion = addon.custom_fields.version || "0.0.0";
+                                                    const currentFilename = addon.custom_fields.file.split("/").pop();
+                                                    const storedFilename = addon.storedFilename || "";
+
+                                                    // Disable the button if no addons need an update
+                                                    return backendVersion !== installedVersion || storedFilename !== currentFilename;
+                                                }).length === 0 || downloading
                                             }
                                         >
                                             {downloading ? (
@@ -1815,7 +2320,7 @@ const AddonsPage = ({
                                             data-bs-toggle="dropdown"
                                             aria-expanded="false"
                                         >
-                                            <i className="bi bi-copy me-1"></i> Import & Export
+                                            <i className="bi bi-copy me-1"></i> Sharing
                                         </button>
                                         <ul
                                             className="dropdown-menu dropdown-custom-dark"
@@ -1897,7 +2402,7 @@ const AddonsPage = ({
                         role="tabpanel"
                         aria-labelledby="browse-addons-tab"
                     >
-                        <div className="row justify-content-between gy-2 mb-4 sticky-top sticky-controls">
+                        <div className="row justify-content-between gy-2 mb-4 sticky-top sticky-controls pt-2">
                             <div className="col-12 col-md-8">
                                 <div className="searchbar-addons-browse position-relative">
                                     <input
@@ -1982,18 +2487,26 @@ const AddonsPage = ({
                         ? handleReinstallAddon
                         : null
                 }
+                onInstall={
+                    contextMenu.addon
+                        ? handleInstallAddon
+                        : null
+                }
                 onDelete={
                     contextMenu.addon && contextMenu.isInstalled
                         ? handleDeleteAddon
                         : null
                 }
                 onViewAddon={handleViewAddon}
+                onViewOnWarperia={() => handleViewOnWarperia(contextMenu.addon)}
                 onReport={handleReportAddon}
                 visible={contextMenu.visible}
                 isInstalled={contextMenu.isInstalled}
                 addonImage={contextMenu.addonImage}
                 addonName={contextMenu.addonName}
                 addonData={contextMenu.addon}
+                folderList={contextMenu.folderList}
+                onOpenAddonFolder={handleOpenAddonFolder}
             />
             {showAddonSelectionModal && (
                 <Suspense
@@ -2090,6 +2603,29 @@ const AddonsPage = ({
                     />
                 </Suspense>
             )}
+            {showDeleteModal && deleteModalData.addon && (
+                <Suspense
+                    fallback={
+                        <div className="text-center my-4">
+                            <div className="spinner-border" role="status">
+                                <span className="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    }
+                >
+                    <DeleteConfirmationModal
+                        show={showDeleteModal}
+                        onClose={() => setShowDeleteModal(false)}
+                        onConfirmDelete={confirmDeleteAddons}
+                        addonToDelete={deleteModalData.addon}
+                        newAddon={deleteModalData.newAddon}
+                        parentWarnings={deleteModalData.parents}
+                        nestedAddons={deleteModalData.children}
+                        isInstallation={deleteModalData.isInstallation}
+                    />
+                </Suspense>
+            )}
+
             {showModal && (
                 <Suspense
                     fallback={
@@ -2105,6 +2641,13 @@ const AddonsPage = ({
                         onHide={handleCloseModal}
                         addon={selectedAddon}
                         loading={addonLoading}
+                        installedAddon={Object.values(installedAddons).find(a => a.id === selectedAddon?.id)}
+                        downloading={downloading}
+                        installingAddonId={installingAddonId}
+                        installingAddonStep={installingAddonStep}
+                        progress={progress}
+                        onInstall={handleInstallAddon}
+                        onReinstall={(addon, e) => handleInstallAddon(addon, e, true)}
                     />
                 </Suspense>
             )}
