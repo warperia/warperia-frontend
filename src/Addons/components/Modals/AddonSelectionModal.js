@@ -6,15 +6,14 @@ const AddonSelectionModal = ({ matchedAddons, onSelectAddon, onCancel }) => {
   const [loadingAddonId, setLoadingAddonId] = useState(null);
 
   const handleAddonSelection = async (addon) => {
-    setLoadingAddonId(addon.id); // Set the loading state for the selected addon
-    await onSelectAddon(addon); // Call the onSelectAddon handler
-    setLoadingAddonId(null); // Reset loading state after selection
-    window.location.reload(); // Refresh the page after successful selection and installation
+    setLoadingAddonId(addon.id);
+    await onSelectAddon(addon);
+    setLoadingAddonId(null);
+    window.location.reload();
   };
 
-  // Sort the matched addons to prioritize any logic (you can adjust this as needed)
   const sortedAddons = [...matchedAddons].sort((a, b) => {
-    return a.title.localeCompare(b.title); // Sort alphabetically by title, for example
+    return a.title.localeCompare(b.title);
   });
 
   return (

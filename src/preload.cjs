@@ -445,7 +445,16 @@ try {
           });
         }
       });
-    }
+    },
+
+    deleteFile: async (filePath) => {
+      try {
+        await fs.promises.unlink(filePath);
+      } catch (error) {
+        console.error('Error deleting file:', error);
+        throw error;
+      }
+    },
 
   });
 } catch (error) {

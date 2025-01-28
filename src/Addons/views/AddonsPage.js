@@ -18,6 +18,7 @@ import updateAddonInstallStats from "../utils/updateAddonInstallStats.js";
 import updateAddonUninstallStats from "../utils/updateAddonUninstallStats.js";
 import useDebouncedSearch from "./../utils/useDebouncedSearch.js";
 import { WEB_URL } from "./../../config.js";
+import cleanupDownload from "../utils/cleanupDownload.js";
 
 // Stylesheets
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -275,9 +276,12 @@ const AddonsPage = ({
     }, []);
 
     // Refresh the user's installed addons
-    const refreshAddonsData = async () => {
+    const refreshAddonsData = async (zipPath) => {
         setAllAddons([]);
         await checkInstalledAddons(gameDir);
+        if (zipPath) {
+            await cleanupDownload(zipPath);
+        }
     };
 
     const fetchAddonsData = useCallback(
@@ -942,19 +946,21 @@ const AddonsPage = ({
                 );
             }
 
-            await updateAddonInstallStats(addon.id, addon.post_type);
-            await checkInstalledAddons(gameDir);
+            // After successful installation, cleanup the zip file
+            await cleanupDownload(zipFilePath);
+            
+            // Update stats and refresh UI
+            await updateAddonInstallStats(addon.id, addon.type);
+            await refreshAddonsData();
+            showToastMessage(`Successfully ${isReinstall ? "reinstalled" : "installed"} "${addonTitle}"`, "success");
         } catch (error) {
             console.error("Error installing addon:", error);
-            showToastMessage(`Failed to install "${addon.title}".`, "danger");
+            showToastMessage(`Failed to install "${addonTitle}": ${error.message}`, "danger");
         } finally {
-            if (!modalShown) {
-                setTimeout(() => {
-                    setDownloading(false);
-                    setProgress(0);
-                    setInstallingAddonId(null);
-                }, 1500);
-            }
+            setDownloading(false);
+            setInstallingAddonId(null);
+            setInstallingAddonStep(null);
+            setProgress(0);
         }
     };
 
@@ -1044,7 +1050,7 @@ const AddonsPage = ({
             const matchedAddons = {};
             let modalQueueTemp = [];
 
-            // 6) Iterate over each folder in the user’s AddOns directory
+            // 6) Iterate over each folder in the user's AddOns directory
             await Promise.all(
                 addonFolders.map(async (folder) => {
                     const folderPath = window.electron.pathJoin(addonsDir, folder);
@@ -1339,7 +1345,7 @@ const AddonsPage = ({
                 }
             }
 
-            // Include any folders from the addon’s folder_list
+            // Include any folders from the addon's folder_list
             folderList.forEach(([relatedFolder]) => {
                 if (
                     !foldersToDelete.includes(relatedFolder) &&
@@ -1469,7 +1475,7 @@ const AddonsPage = ({
                     }
                 });
 
-                // Before removing each folder, skip it if it’s the main folder of a sub‐addon the user *didn't* select for deletion
+                // Before removing each folder, skip it if it's the main folder of a sub‐addon the user *didn't* select for deletion
                 foldersToDelete = foldersToDelete.filter((folderName) => {
                     const possibleSubAddonId = mainFolderMap[folderName];
                     // If this folder is *not* someone's main folder, we can safely remove it
