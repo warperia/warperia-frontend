@@ -296,7 +296,7 @@ try {
       try {
         const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
         const files = entries
-          .filter(entry => entry.isFile() && (entry.name.endsWith('.lua') || entry.name.endsWith('.toc')))
+          .filter(entry => entry.isFile() && (entry.name.endsWith('.lua') || entry.name.endsWith('.toc') || entry.name.endsWith('.blp') || entry.name.endsWith('.xml') || entry.name.endsWith('.tga') || entry.name.endsWith('.ttf')))
           .map(file => file.name);
         const directories = entries.filter(entry => entry.isDirectory()).map(entry => entry.name);
 

@@ -18,6 +18,7 @@ import updateAddonInstallStats from "../utils/updateAddonInstallStats.js";
 import updateAddonUninstallStats from "../utils/updateAddonUninstallStats.js";
 import useDebouncedSearch from "./../utils/useDebouncedSearch.js";
 import { WEB_URL } from "./../../config.js";
+import { GITHUB_TOKEN } from "./../../config.js";
 import cleanupDownload from "../utils/cleanupDownload.js";
 
 // Stylesheets
@@ -41,6 +42,7 @@ const AddonModal = lazy(() => import("../components/Modals/AddonModal.js"));
 // Addon Cards
 import InstalledAddonCard from "./../components/Cards/InstalledAddonCard.js";
 import BrowseAddonCard from "./../components/Cards/BrowseAddonCard.js";
+const GITHUB_ACCESS_TOKEN = `${GITHUB_TOKEN}`;
 
 const AddonsPage = ({
     user,
@@ -141,6 +143,8 @@ const AddonsPage = ({
     // Addon Installation Progress
     const [installingAddonStep, setInstallingAddonStep] = useState(null);
     const [progress, setProgress] = useState(0);
+    const [autoProgressTimer, setAutoProgressTimer] = useState(null);
+    const [artificialProgress, setArtificialProgress] = useState(0);
 
     // Toggle the accordion open/close for a given addon ID.
     function toggleAddonExpansion(addonId) {
@@ -646,6 +650,232 @@ const AddonsPage = ({
         return normalizedTitle;
     };
 
+    // Recursively copy all files/subfolders from src to dest.
+    async function copyFolderRecursively(src, dest) {
+        // Ensure the destination folder exists
+        await window.electron.createFolder(dest);
+    
+        // readDirAndFiles must *not* filter out .blp or other extensions
+        const { files, directories } = await window.electron.readDirAndFiles(src);
+    
+        // 1) Copy over all files in `src`
+        for (const file of files) {
+            const srcFilePath = window.electron.pathJoin(src, file);
+            const destFilePath = window.electron.pathJoin(dest, file);
+    
+            // Read & write
+            const content = await window.electron.readFile(srcFilePath);
+            await window.electron.overwriteFile(destFilePath, content);
+        }
+    
+        // 2) Recursively copy all subfolders
+        for (const dir of directories) {
+            const srcSub = window.electron.pathJoin(src, dir);
+            const destSub = window.electron.pathJoin(dest, dir);
+            await copyFolderRecursively(srcSub, destSub);
+        }
+    }
+
+    /**
+   * Move all subfolders from `srcParent` directly into `dstFolder`.
+   * Then remove `srcParent` itself. This "flattens" one level of nesting.
+   */
+    async function flattenSingleExtractedFolder(srcParent, dstFolder) {
+        // Read the entire contents
+        const { files, directories } = await window.electron.readDirAndFiles(srcParent);
+    
+        // 1) Move/copy each file
+        for (const file of files) {
+            const oldFilePath = window.electron.pathJoin(srcParent, file);
+            const newFilePath = window.electron.pathJoin(dstFolder, file);
+    
+            // Copy file content
+            const fileContent = await window.electron.readFile(oldFilePath);
+            await window.electron.overwriteFile(newFilePath, fileContent);
+    
+            // Optionally delete the old file
+            await window.electron.deleteFile(oldFilePath);
+        }
+    
+        // 2) Recursively copy each subfolder
+        for (const dir of directories) {
+            const oldSubPath = window.electron.pathJoin(srcParent, dir);
+            const newSubPath = window.electron.pathJoin(dstFolder, dir);
+    
+            await copyFolderRecursively(oldSubPath, newSubPath);
+            await window.electron.deleteFolder(oldSubPath);
+        }
+    
+        // 3) Finally remove srcParent
+        await window.electron.deleteFolder(srcParent);
+    }
+
+    // Check if the newly extracted folder actually contains multiple subfolders
+    async function hasMultipleSubfolders(extractedParentPath, addonFolderList) {
+        // Gather every subdirectory in the extracted parent
+        const { directories } = await window.electron.readDirAndFiles(extractedParentPath);
+        const expectedFolders = addonFolderList.map(([folderName]) => folderName);
+        let matchCount = 0;
+        for (const dir of directories) {
+            if (expectedFolders.includes(dir)) {
+                matchCount++;
+            }
+        }
+        return matchCount >= 2;
+    }
+
+    // Fetch GitHub information
+    async function fetchGitHubFingerprint(owner, repo, token) {
+        let latestReleaseTag = "";
+        let latestReleaseDate = null;
+        let latestCommitSha = "";
+        let latestCommitDate = null;
+
+        // 1) Attempt to fetch the latest release
+        try {
+            const releaseRes = await axios.get(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (releaseRes.data && releaseRes.data.tag_name && releaseRes.data.published_at) {
+                latestReleaseTag = releaseRes.data.tag_name; 
+                latestReleaseDate = new Date(releaseRes.data.published_at);
+            }
+        } catch (err) {
+        }
+
+        // 2) Fetch repo info for the default branch
+        const repoMeta = await axios.get(`https://api.github.com/repos/${owner}/${repo}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        const defaultBranch = repoMeta.data.default_branch || "main";
+
+        // 3) Fetch the latest commit on default branch
+        const commitRes = await axios.get(
+            `https://api.github.com/repos/${owner}/${repo}/commits/${defaultBranch}`,
+            {
+                headers: { Authorization: `Bearer ${token}` },
+            }
+        );
+        if (commitRes.data && commitRes.data.sha && commitRes.data.commit?.committer?.date) {
+            latestCommitSha = commitRes.data.sha.slice(0, 7); // e.g. "abc1234"
+            latestCommitDate = new Date(commitRes.data.commit.committer.date);
+        }
+
+        // 4) Compare whichever date is more recent
+        if (latestReleaseDate && latestCommitDate) {
+            // If both exist, pick whichever is later
+            if (latestReleaseDate > latestCommitDate) {
+                // release is newer => use tag
+                return { type: "release", value: latestReleaseTag };
+            } else {
+                // commit is newer => use commit
+                return { type: "commit", value: latestCommitSha };
+            }
+        } else if (latestReleaseDate) {
+            // only release was found
+            return { type: "release", value: latestReleaseTag };
+        } else {
+            // fallback: only commit was found
+            return { type: "commit", value: latestCommitSha || "unknownSHA" };
+        }
+    }
+
+    // Extract GitFingerprint from the .warperia content, if present.
+    function parseGitFingerprint(warperiaContent) {
+        const match = warperiaContent.match(/^GitFingerprint:\s*(.+)$/m);
+        if (match) {
+            return match[1].trim();
+        }
+        return null; // Not found
+    }
+
+    const startArtificialProgress = () => {
+        // Clear any existing timer
+        if (autoProgressTimer) {
+            clearInterval(autoProgressTimer);
+            setAutoProgressTimer(null);
+        }
+        // Initialize progress at 10 (or whatever start you want)
+        setArtificialProgress(10);
+        // Increment up to ~90 over time, so user sees progress moving
+        const timerId = setInterval(() => {
+            setArtificialProgress((prev) => {
+                // If we reach 90%, stop incrementing
+                if (prev >= 90) {
+                    return prev;
+                }
+                return prev + 2; // each interval => +2%
+            });
+        }, 1000); // run every 1s
+        setAutoProgressTimer(timerId);
+    };
+
+    const stopArtificialProgress = (finalValue = 100) => {
+        if (autoProgressTimer) {
+            clearInterval(autoProgressTimer);
+            setAutoProgressTimer(null);
+        }
+        // Immediately set it to finalValue if you want 100% on done
+        setArtificialProgress(finalValue);
+    };
+
+    async function checkIfGitHubOutdated(installedAddon) {
+        const websiteLink = installedAddon.custom_fields?.website_link || "";
+        if (!websiteLink.includes("github.com")) {
+            // Not a GitHub addon => no check
+            return false;
+        }
+
+        const localFingerprint = installedAddon.localGitFingerprint || "";
+        if (!localFingerprint) {
+            return false;
+        }
+
+        try {
+            const githubRegex = /https?:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/|$)/;
+            const match = websiteLink.match(githubRegex);
+            if (!match) return false;
+
+            const owner = match[1];
+            const repo = match[2];
+
+            const { value: remoteFingerprint } = await fetchGitHubFingerprint(
+                owner,
+                repo,
+                GITHUB_ACCESS_TOKEN
+            );
+
+            // If no remoteFingerprint, we can't do anything
+            if (!remoteFingerprint) return false;
+
+            // Compare
+            if (remoteFingerprint !== localFingerprint) {
+                // Found a newer commit or release on GitHub
+                return true;
+            }
+            return false;
+        } catch (err) {
+            console.error("Error checking GitHub fingerprint:", err);
+            return false;
+        }
+    }
+
+    // Helper function to compare addon versions so we can pick the higher one
+    function semverCompare(a, b) {
+        const parse = (v) => v.split(".").map(n => parseInt(n, 10) || 0);
+        const [aMajor, aMinor, aPatch] = parse(a);
+        const [bMajor, bMinor, bPatch] = parse(b);
+
+        if (aMajor > bMajor) return 1;
+        if (aMajor < bMajor) return -1;
+        if (aMinor > bMinor) return 1;
+        if (aMinor < bMinor) return -1;
+        if (aPatch > bPatch) return 1;
+        if (aPatch < bPatch) return -1;
+        return 0;
+    }
+
+
     const handleInstallAddon = async (addon, event, isReinstall = false, skipBundledCheck = false) => {
         event.preventDefault();
         event.stopPropagation();
@@ -694,13 +924,16 @@ const AddonsPage = ({
             skipBundledCheck = true;
         }
 
+        let gitFingerprint = null;
+
         try {
             setDownloading(true);
             setInstallingAddonId(addon.id);
             setInstallingAddonStep("Deleting previous folders");
 
+            // ----------------------------------------------------------------------------------
             // Step 1: Handle Variations
-
+            // ----------------------------------------------------------------------------------
             let mainAddon = addon;
             const isVariation = addon.custom_fields.variation;
 
@@ -717,7 +950,6 @@ const AddonsPage = ({
             const relatedAddons = parseSerializedPHPArray(hasVariations);
 
             // Check if the main addon or any of its variations have bundled addons
-            // const allAddonsToCheck = [mainAddon, ...relatedAddons.map(id => allAddons.find(a => a.id === id))];
             const currentlyInstalledAddon = Object.values(installedAddons).find(
                 (installed) => {
                     // Check if the installed addon is the main addon or one of its variations
@@ -727,23 +959,33 @@ const AddonsPage = ({
                     );
                 }
             );
-            //Skip bundled check if flag is true
+
+            // ----------------------------------------------------------------------------------
+            // Step 2: Optional Bundled Addons Check
+            // ----------------------------------------------------------------------------------
             if (!skipBundledCheck) {
                 // Check if main addon/variations have bundled addons
-                const allAddonsToCheck = [mainAddon, ...relatedAddons.map(id => allAddons.find(a => a.id === id))];
-                const bundledAddons = allAddonsToCheck.flatMap(parentAddon => {
-                    return findChildAddons(parentAddon, installedAddons).filter(child => {
-                        // Only consider children that are EXCLUSIVE to this parent
-                        const childParents = findParentAddons(child, installedAddons);
-                        return childParents.some(p => p.id === parentAddon.id);
-                    });
+                const allAddonsToCheck = [
+                    mainAddon,
+                    ...relatedAddons.map((id) => allAddons.find((a) => a.id === id)),
+                ];
+                const bundledAddons = allAddonsToCheck.flatMap((parentAddon) => {
+                    return findChildAddons(parentAddon, installedAddons).filter(
+                        (child) => {
+                            // Only consider children that are EXCLUSIVE to this parent
+                            const childParents = findParentAddons(child, installedAddons);
+                            return childParents.some((p) => p.id === parentAddon.id);
+                        }
+                    );
                 });
 
                 const findStandaloneCopies = (mainAddon, installedAddons) => {
                     // Get main addon's root parent
                     const getRootParent = (addon) => {
                         if (addon.custom_fields?.variation && addon.custom_fields.variation !== "0") {
-                            const parent = allAddons.find(a => a.id === parseInt(addon.custom_fields.variation));
+                            const parent = allAddons.find(
+                                (a) => a.id === parseInt(addon.custom_fields.variation)
+                            );
                             return parent ? getRootParent(parent) : addon;
                         }
                         return addon;
@@ -751,37 +993,42 @@ const AddonsPage = ({
 
                     const mainRoot = getRootParent(mainAddon);
 
-                    return [...new Set(
-                        Object.values(installedAddons).filter(installed => {
-                            const installedRoot = getRootParent(installed);
-                            return installedRoot.id !== mainRoot.id &&
-                                installed.custom_fields.folder_list.some(([f]) =>
-                                    mainAddon.custom_fields.folder_list.some(([mf]) => mf === f)
+                    return [
+                        ...new Set(
+                            Object.values(installedAddons).filter((installed) => {
+                                const installedRoot = getRootParent(installed);
+                                return (
+                                    installedRoot.id !== mainRoot.id &&
+                                    installed.custom_fields.folder_list.some(([f]) =>
+                                        mainAddon.custom_fields.folder_list.some(
+                                            ([mf]) => mf === f
+                                        )
+                                    )
                                 );
-                        })
-                    )];
+                            })
+                        ),
+                    ];
                 };
 
-                if (bundledAddons.length > 0 && !skipBundledCheck) {
-                    // Show deletion modal
+                if (bundledAddons.length > 0) {
                     setDeleteModalData({
                         addon: currentlyInstalledAddon,
                         newAddon: mainAddon,
                         parents: [],
                         children: bundledAddons,
                         isInstallation: true,
-                        standaloneAddons: findStandaloneCopies(mainAddon, installedAddons)
+                        standaloneAddons: findStandaloneCopies(mainAddon, installedAddons),
                     });
                     setShowDeleteModal(true);
                     setShowModal(false);
                     return;
                 }
-
             }
 
-            // Delete folders from main addon + all variations
+            // ----------------------------------------------------------------------------------
+            // Step 2.5: Delete existing folders from main addon + all variations
+            // ----------------------------------------------------------------------------------
             const addonsToDelete = [mainAddon.id, ...relatedAddons];
-
             await Promise.all(
                 addonsToDelete.map(async (relatedAddonId) => {
                     const installedAddon = Object.values(installedAddons).find(
@@ -789,38 +1036,49 @@ const AddonsPage = ({
                     );
 
                     if (installedAddon) {
-                        const foldersToDelete =
-                            installedAddon.custom_fields.folder_list.map(
-                                ([folderName]) => folderName
-                            );
+                        const foldersToDelete = installedAddon.custom_fields.folder_list.map(
+                            ([folderName]) => folderName
+                        );
 
                         await Promise.all(
                             foldersToDelete.map(async (folder) => {
-                                const folderPath = window.electron.pathJoin(installPath, folder);
-
-                                // Get ALL installed addons using this folder
-                                const folderUsers = Object.values(installedAddons).filter(installed =>
-                                    installed.custom_fields.folder_list.some(([f]) => f === folder)
+                                const folderPath = window.electron.pathJoin(
+                                    installPath,
+                                    folder
                                 );
 
-                                const isSameFamily = folderUsers.some(installed => {
+                                // Get ALL installed addons using this folder
+                                const folderUsers = Object.values(installedAddons).filter(
+                                    (inst) =>
+                                        inst.custom_fields.folder_list.some(
+                                            ([f]) => f === folder
+                                        )
+                                );
+
+                                const isSameFamily = folderUsers.some((inst) => {
                                     // Recursive family check
                                     const getRootParent = (addon) => {
-                                        if (addon.custom_fields?.variation && addon.custom_fields.variation !== "0") {
-                                            const parent = allAddons.find(a => a.id === parseInt(addon.custom_fields.variation));
+                                        if (
+                                            addon.custom_fields?.variation &&
+                                            addon.custom_fields.variation !== "0"
+                                        ) {
+                                            const parent = allAddons.find(
+                                                (a) =>
+                                                    a.id ===
+                                                    parseInt(addon.custom_fields.variation)
+                                            );
                                             return parent ? getRootParent(parent) : addon;
                                         }
                                         return addon;
                                     };
 
-                                    const installedRoot = getRootParent(installed);
+                                    const installedRoot = getRootParent(inst);
                                     const mainAddonRoot = getRootParent(mainAddon);
 
                                     return installedRoot.id === mainAddonRoot.id;
                                 });
 
                                 if (!isSameFamily) {
-                                    console.log(`Preserving unrelated folder: ${folder}`);
                                     return; // Skip deletion
                                 }
 
@@ -835,12 +1093,14 @@ const AddonsPage = ({
                                 }
 
                                 // Check if folder is used by other installed addons
-                                const isFolderUsed = Object.values(installedAddons).some(ia =>
-                                    ia.id !== installedAddon.id &&
-                                    ia.custom_fields.folder_list.some(([f]) => f === folder)
+                                const isFolderUsed = Object.values(installedAddons).some(
+                                    (ia) =>
+                                        ia.id !== installedAddon.id &&
+                                        ia.custom_fields.folder_list.some(
+                                            ([f]) => f === folder
+                                        )
                                 );
                                 if (isFolderUsed) {
-                                    console.log(`Skipping ${folder} (used by another addon)`);
                                     return; // Skip deletion
                                 }
 
@@ -851,7 +1111,9 @@ const AddonsPage = ({
                                     setInstallingAddonStep(`Deleting old folders`);
 
                                     // Check if the folder still exists using fileExists
-                                    if (!(await window.electron.fileExists(folderPath))) {
+                                    if (
+                                        !(await window.electron.fileExists(folderPath))
+                                    ) {
                                         deleteSuccess = true;
                                         break;
                                     } else {
@@ -859,8 +1121,10 @@ const AddonsPage = ({
                                             `Attempt ${attempt + 1
                                             } to delete folder ${folderPath} failed. Retrying...`
                                         );
-                                        // Reduce the delay time for retries to speed up the process
-                                        await new Promise((resolve) => setTimeout(resolve, 200));
+                                        // Short delay before retry
+                                        await new Promise((resolve) =>
+                                            setTimeout(resolve, 200)
+                                        );
                                     }
                                 }
 
@@ -876,40 +1140,286 @@ const AddonsPage = ({
                 })
             );
 
+            // ----------------------------------------------------------------------------------
             // Step 3: Download and extract the new addon
+            // IMPORTANT: responseType is "blob" so .arrayBuffer() works in Electron
+            // ----------------------------------------------------------------------------------
             setInstallingAddonStep("Downloading addon...");
-            const response = await axios.get(addonUrl, {
-                responseType: "blob",
-                onDownloadProgress: (progressEvent) => {
-                    const percentCompleted = Math.round(
-                        (progressEvent.loaded * 100) / progressEvent.total
-                    );
-                    setProgress(percentCompleted);
-                },
-            });
 
-            const fileName = addonUrl.split("/").pop();
-            const zipFilePath = await window.electron.saveZipFile(
-                response.data,
-                fileName
-            );
+            let contentLength = 0;
+            let response;
+            let fileName;
+            let zipFilePath;
+
+            // Check if there's a GitHub link in website_link
+            const websiteLink = addon.custom_fields.website_link || "";
+
+            if (websiteLink.includes("github.com")) {
+                try {
+                    // Attempt GitHub download
+                    const githubRegex = /https?:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/|$)/;
+                    const match = websiteLink.match(githubRegex);
+
+                    if (!match) {
+                        throw new Error("Invalid GitHub URL format");
+                    }
+
+                    const owner = match[1];
+                    const repo = match[2];
+
+                    // 1) Fetch repo metadata (for default branch)
+                    const repoMeta = await axios.get(
+                        `https://api.github.com/repos/${owner}/${repo}`,
+                        {
+                            headers: {
+                                Authorization: `Bearer ${GITHUB_ACCESS_TOKEN}`,
+                            },
+                        }
+                    );
+                    const defaultBranch = repoMeta.data.default_branch || "main";
+
+                    // 2) Download the repository zip from default branch
+                    const zipUrl = `https://api.github.com/repos/${owner}/${repo}/zipball/${defaultBranch}`;
+                    try {
+                        const headRes = await axios.head(zipUrl, {
+                            headers: {
+                                Authorization: `Bearer ${GITHUB_ACCESS_TOKEN}`,
+                                Accept: "application/vnd.github.v3.raw",
+                            },
+                        });
+                        if (headRes.headers["content-length"]) {
+                            contentLength = parseInt(headRes.headers["content-length"], 10);
+                        } else {
+                            startArtificialProgress();
+                        }
+                    } catch (headError) {
+                        console.warn("[Warperia] HEAD request failed. Falling back to unknown size.");
+                    }
+
+                    // 3) Download the repository zip from default branch
+                    response = await axios.get(zipUrl, {
+                        responseType: "blob",
+                        maxContentLength: Infinity, // prevent large-file truncation
+                        maxBodyLength: Infinity,
+                        headers: {
+                            Authorization: `Bearer ${GITHUB_ACCESS_TOKEN}`,
+                            Accept: "application/vnd.github.v3.raw",
+                        },
+                        onDownloadProgress: (progressEvent) => {
+                            let total = contentLength || progressEvent.total;
+
+                            if (total && total > 0) {
+                                // We know the file size => normal real progress
+                                const percentCompleted = Math.round(
+                                    (progressEvent.loaded * 100) / total
+                                );
+                                // Stop artificial increments & reflect real progress
+                                stopArtificialProgress(percentCompleted);
+                                setProgress(percentCompleted);
+                            } else {
+                                // We do NOT know the file size => use artificial progress
+                                setProgress(artificialProgress);
+                            }
+                        },
+                    });
+
+                    // Once download completes, jump to 100%
+                    stopArtificialProgress(100);
+                    setProgress(100);
+
+                    // We'll name the downloaded file after the addon title
+                    fileName = `${addonTitle.replace(/\s+/g, "_")}.zip`;
+
+                    // Save the file using Electron bridge
+                    zipFilePath = await window.electron.saveZipFile(
+                        response.data,
+                        fileName
+                    );
+
+                    // 3) Attempt to fetch the current GitHub fingerprint (release tag or commit SHA)
+                    try {
+                        const githubRegex = /https?:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/|$)/;
+                        const matchGit = websiteLink.match(githubRegex);
+                        if (matchGit) {
+                            const owner = matchGit[1];
+                            const repo = matchGit[2];
+                            const { type, value } = await fetchGitHubFingerprint(owner, repo, GITHUB_ACCESS_TOKEN);
+                            gitFingerprint = value;
+                        }
+                    } catch (fetchErr) {
+                        console.warn("Failed to fetch GitHub fingerprint:", fetchErr);
+                        // Not fatal; we just won't store anything
+                    }
+
+                } catch (githubError) {
+                    console.warn(
+                        "GitHub download failed. Falling back to original WordPress download:",
+                        githubError
+                    );
+
+                    // Fallback to WordPress zip
+                    response = await axios.get(addonUrl, {
+                        responseType: "blob",
+                        onDownloadProgress: (progressEvent) => {
+                            const percentCompleted = Math.round(
+                                (progressEvent.loaded * 100) / progressEvent.total
+                            );
+                            setProgress(percentCompleted);
+                        },
+                    });
+                    fileName = addonUrl.split("/").pop();
+                    zipFilePath = await window.electron.saveZipFile(
+                        response.data,
+                        fileName
+                    );
+                }
+            } else {
+                // Original WordPress download
+                response = await axios.get(addonUrl, {
+                    responseType: "blob",
+                    onDownloadProgress: (progressEvent) => {
+                        const percentCompleted = Math.round(
+                            (progressEvent.loaded * 100) / progressEvent.total
+                        );
+                        setProgress(percentCompleted);
+                    },
+                });
+                fileName = addonUrl.split("/").pop();
+                zipFilePath = await window.electron.saveZipFile(response.data, fileName);
+            }
+
+            // Record what's in AddOns before extraction
+            const beforeInstallItems = await window.electron.readDir(installPath);
+
+            // Extract into the AddOns folder
             await window.electron.extractZip(zipFilePath, installPath);
 
-            // Step 4: Write the .warperia file with correct information
+            // ----------------------------------------------------------------------------------
+            // Step 3.5: Rename the newly extracted folder to match the main folder name
+            // IF (and only if) there's exactly one new top-level directory.
+            // ----------------------------------------------------------------------------------
+            setInstallingAddonStep("Restructuring folder...");
             const mainFolder = addon.custom_fields.folder_list.find(
                 ([_, isMain]) => isMain === "1"
             );
             if (!mainFolder) {
-                console.error("Main folder not found for addon:", addonTitle);
-                showToastMessage(`Main folder not found for "${addonTitle}"`, "danger");
-                return;
+                console.error("Main folder not found in addon data:", addonTitle);
+                showToastMessage(
+                    `Main folder not found for "${addonTitle}"`,
+                    "danger"
+                );
+                throw new Error("Missing mainFolder in custom_fields.folder_list");
+            }
+            const [mainFolderName] = mainFolder;
+
+            // 2) Compare "before" vs. "after" to see only new folders
+            const afterInstallItems = await window.electron.readDir(installPath);
+            const newlyExtractedFolders = afterInstallItems.filter(
+                (item) => !beforeInstallItems.includes(item)
+            );
+
+            // 2) If there's exactly one new parent folder, flatten it so that
+            // all subfolders  end up in AddOns.
+            if (newlyExtractedFolders.length === 1) {
+                const extractedFolderName = newlyExtractedFolders[0];
+                const extractedFolderPath = window.electron.pathJoin(installPath, extractedFolderName);
+
+                // 1) Check if this single folder contains multiple subfolders from the addon folder_list
+                const isMultiFolder = await hasMultipleSubfolders(extractedFolderPath, addon.custom_fields.folder_list);
+
+                if (isMultiFolder) {
+                    // MULTI-FOLDER scenario
+                    // Flatten them all directly into AddOns
+                    await flattenSingleExtractedFolder(extractedFolderPath, installPath);
+                } else {
+                    // SIMPLE SINGLE-FOLDER scenario => do the old rename approach
+                    let finalFolderPath = extractedFolderPath;
+                    if (extractedFolderName !== mainFolderName) {
+                        const oldPath = extractedFolderPath;
+                        const newPath = window.electron.pathJoin(installPath, mainFolderName);
+                    
+                        await copyFolderRecursively(oldPath, newPath);
+                        await window.electron.deleteFolder(oldPath);
+                    
+                        // Now the actual folder is called "mainFolderName"
+                        finalFolderPath = newPath;
+
+                        try {
+                            // 1) Read subfolders from the finalFolderPath
+                            const { directories: subfolders } = await window.electron.readDirAndFiles(finalFolderPath);
+                        
+                            // 2) If there's exactly one subfolder with the *same* name, flatten again:
+                            if (subfolders.length === 1 && subfolders[0] === mainFolderName) {
+                              console.log(`[Warperia] Found a double folder: ${mainFolderName}\\${mainFolderName}. Flattening...`);
+                        
+                              const innerPath = window.electron.pathJoin(finalFolderPath, mainFolderName);
+                              await flattenSingleExtractedFolder(innerPath, finalFolderPath);
+                            }
+                          } catch (err) {
+                            console.warn("Double‐folder check failed:", err);
+                          }
+                      }
+                }
+
+                try {
+                    // Check if the extracted folder exactly matches your mainFolderName
+                    if (extractedFolderName === mainFolderName) {
+                      // Read the subfolders INSIDE that newly renamed folder
+                      const { directories: subfolders } = await window.electron.readDirAndFiles(extractedFolderPath);
+                  
+                      // If there's exactly one subfolder with the same name, flatten again
+                      if (
+                        subfolders.length === 1 &&
+                        subfolders[0] === mainFolderName
+                      ) {
+                        console.log(`[Warperia] Detected a double folder: ${mainFolderName}/${mainFolderName}. Flattening...`);
+                  
+                        // Example approach: flatten the "inner" Auctionator into the "outer"
+                        const innerPath = window.electron.pathJoin(extractedFolderPath, mainFolderName);
+                        await flattenSingleExtractedFolder(innerPath, extractedFolderPath);
+                      }
+                    }
+                  } catch (err) {
+                    console.warn("Error checking for double-nested folder:", err);
+                  }
             }
 
-            const [mainFolderName] = mainFolder;
-            const mainFolderPath = `${installPath}\\${mainFolderName}`;
-            const tocFilePath = `${mainFolderPath}\\${mainFolderName}.toc`;
 
-            // Ensure extraction is complete before writing the .warperia file
+            // ----------------------------------------------------------------------------------
+            // Clean up top-level GitHub files you don't want in the AddOns folder
+            // (READMEs, .gitignore, etc.)
+            // ----------------------------------------------------------------------------------
+            setInstallingAddonStep("Removing leftover files...");
+            const topLevelExtras = [
+                "README.md",
+                "readme.md",
+                "README.MD",
+                "LICENSE",
+                "LICENSE.md",
+                ".gitignore",
+                ".gitattributes",
+                ".github",
+            ];
+            for (const extra of topLevelExtras) {
+                const extraPath = window.electron.pathJoin(installPath, extra);
+                if (await window.electron.fileExists(extraPath)) {
+                    await window.electron.deleteFolder(extraPath);
+                }
+            }
+
+            // ----------------------------------------------------------------------------------
+            // Step 4: Write the .warperia file + update .toc version
+            // ----------------------------------------------------------------------------------
+            const mainFolderPath = window.electron.pathJoin(
+                installPath,
+                mainFolderName
+            );
+            const tocFilePath = window.electron.pathJoin(
+                mainFolderPath,
+                `${mainFolderName}.toc`
+            );
+
+            // Ensure extraction/renaming is complete before writing the new file
             await new Promise((resolve) => setTimeout(resolve, 500));
 
             if (await window.electron.fileExists(tocFilePath)) {
@@ -917,12 +1427,20 @@ const AddonsPage = ({
                     (await window.electron.readVersionFromToc(tocFilePath)) || "1.0.0";
 
                 // Double-check that no old data is left before writing the new file
-                const warperiaFilePath = `${mainFolderPath}\\${mainFolderName}.warperia`;
-                await window.electron.deleteFolder(warperiaFilePath); // Delete old .warperia
+                const warperiaFilePath = window.electron.pathJoin(
+                    mainFolderPath,
+                    `${mainFolderName}.warperia`
+                );
+
+                const wordPressVersionAtTimeOfInstall = addon.custom_fields.version || '1.0.0';
+                const backendFilename = addon.custom_fields.file.split("/").pop();
+
+                await window.electron.deleteFolder(warperiaFilePath); // Delete old .warperia if exists
                 const warperiaContent = `ID: ${addon.id
                     }\nFolders: ${addon.custom_fields.folder_list
                         .map(([folderName]) => folderName)
-                        .join(",")}\nFilename: ${addonUrl.split("/").pop()}`;
+                        .join(",")}\nBackendVersion: ${wordPressVersionAtTimeOfInstall}\nFilename: ${backendFilename}\n${gitFingerprint ? `GitFingerprint: ${gitFingerprint}` : ""}`;
+
                 await window.electron.writeFile(warperiaFilePath, warperiaContent);
 
                 // Immediately read back the file to confirm content
@@ -934,33 +1452,42 @@ const AddonsPage = ({
                         "but got:",
                         writtenContent
                     );
-                } else {
                 }
 
-                const backendVersion = addon.custom_fields.version || versionFromToc;
-                await window.electron.updateTocVersion(mainFolderPath, backendVersion);
+                // Compare versionFromToc vs. wordPressVersionAtTimeOfInstall
+                let finalTocVersion = versionFromToc;
+                const compareResult = semverCompare(versionFromToc, wordPressVersionAtTimeOfInstall);
+                if (compareResult < 0) {
+                    finalTocVersion = wordPressVersionAtTimeOfInstall;
+                }
+                await window.electron.updateTocVersion(mainFolderPath, finalTocVersion);
 
             } else {
+                // If the .toc wasn't found in the newly renamed folder:
                 console.warn(
                     `No .toc file found in main folder "${mainFolderName}", defaulting to version 1.0.0.`
                 );
             }
 
-            // After successful installation, cleanup the zip file
+            // ----------------------------------------------------------------------------------
+            // Step 5: Cleanup and finalize installation
+            // ----------------------------------------------------------------------------------
             await cleanupDownload(zipFilePath);
-            
-            // Update stats and refresh UI
             await updateAddonInstallStats(addon.id, addon.type);
             await refreshAddonsData();
-            showToastMessage(`Successfully ${isReinstall ? "reinstalled" : "installed"} "${addonTitle}"`, "success");
+            showToastMessage(
+                `Your addon was ${isReinstall ? "reinstalled" : "installed"}!`,
+                "success"
+            );
         } catch (error) {
             console.error("Error installing addon:", error);
-            showToastMessage(`Failed to install "${addonTitle}": ${error.message}`, "danger");
+            showToastMessage(`The addon couldn't be installed: ${error.message}`, "danger");
         } finally {
             setDownloading(false);
             setInstallingAddonId(null);
             setInstallingAddonStep(null);
             setProgress(0);
+            stopArtificialProgress(0);
         }
     };
 
@@ -1089,11 +1616,19 @@ const AddonsPage = ({
                     }
 
                     let storedFilename = "";
+                    let localGitFingerprint = null;
+                    let localWordPressVersion = "";
 
                     if (await window.electron.fileExists(warperiaFile)) {
                         const warperiaContent = await window.electron.readFile(warperiaFile);
                         const installedAddonId = warperiaContent.match(/ID:\s*(\d+)/)?.[1];
                         const filenameMatch = warperiaContent.match(/Filename:\s*(.+)/);
+                        const localWpVersionMatch = warperiaContent.match(/^WordPressVersion:\s*(.+)$/m);
+                        let localWordPressVersion = "";
+                        if (localWpVersionMatch) {
+                            localWordPressVersion = localWpVersionMatch[1].trim();
+                        }
+                        const localGitFingerprint = parseGitFingerprint(warperiaContent);
                         if (filenameMatch) {
                             storedFilename = filenameMatch[1];
                         }
@@ -1132,6 +1667,8 @@ const AddonsPage = ({
                                     missingFolders,
                                     localVersion: tocVersion,
                                     storedFilename,
+                                    localGitFingerprint,
+                                    localWordPressVersion
                                 };
                                 return; // Done with this folder
                             }
@@ -1153,6 +1690,8 @@ const AddonsPage = ({
                             missingFolders,
                             localVersion: tocVersion,
                             storedFilename,
+                            localGitFingerprint,
+                            localWordPressVersion
                         };
                         return;
                     }
@@ -1167,6 +1706,17 @@ const AddonsPage = ({
                 setModalQueue(modalQueueTemp);
                 setCurrentModalData(modalQueueTemp[0]);
                 setShowAddonSelectionModal(true);
+            }
+
+            // 7.5) For each installed addon, if it has a GitHub link & local fingerprint, check if there's a new commit/release
+            // This makes Warperia "see" a new commit on refresh
+            for (const folderName of Object.keys(matchedAddons)) {
+                const installedAddon = matchedAddons[folderName];
+                const isOutdatedOnGitHub = await checkIfGitHubOutdated(installedAddon);
+                if (isOutdatedOnGitHub) {
+                    installedAddon.corrupted = true;
+                }
+                matchedAddons[folderName] = installedAddon;
             }
 
             // 8) Update our state for all installed addons we confidently matched
@@ -1515,10 +2065,10 @@ const AddonsPage = ({
     const parseSerializedPHPArray = (serializedData) => {
         if (!serializedData) return [];
 
-        // Handle direct arrays (common in REST API)
+        // Handle direct arrays
         if (Array.isArray(serializedData)) return serializedData;
 
-        // Handle PHP-serialized strings (e.g., "a:1:{i:0;i:3268;}")
+        // Handle PHP-serialized strings
         const regex = /i:\d+;i:(\d+);/g;
         const matches = [];
         let match;
@@ -1653,7 +2203,7 @@ const AddonsPage = ({
         try {
             const installPath = `${gameDir}\\Interface\\AddOns`;
 
-            // Get the main folder from the addon's folder list
+            // Identify main folder from the addon’s folder_list
             const mainFolder = addon.custom_fields.folder_list.find(
                 ([_, isMain]) => isMain === "1"
             )[0];
@@ -1661,44 +2211,105 @@ const AddonsPage = ({
             const tocFilePath = `${mainFolderPath}\\${mainFolder}.toc`;
             const warperiaFilePath = `${mainFolderPath}\\${mainFolder}.warperia`;
 
-            // Read the current version from the .toc file
-            const currentVersion = await window.electron.readVersionFromToc(
-                tocFilePath
-            );
-            const backendVersion = addon.custom_fields.version || "1.0.0"; // Version from the backend
-
-            // Read the .warperia file to get the stored filename
+            // 1) Local .toc version + local .warperia data
+            const currentVersion = await window.electron.readVersionFromToc(tocFilePath) || "1.0.0";
             let storedFilename = "";
+            let localGitFingerprint = "";
+            let localWordPressVersion = "";
+
             if (await window.electron.fileExists(warperiaFilePath)) {
                 const warperiaContent = await window.electron.readFile(warperiaFilePath);
-                const filenameMatch = warperiaContent.match(/Filename:\s*(.+)/);
+
+                // Filename
+                const filenameMatch = warperiaContent.match(/^Filename:\s*(.+)$/m);
                 if (filenameMatch) {
-                    storedFilename = filenameMatch[1];
+                    storedFilename = filenameMatch[1].trim();
+                }
+
+                // GitFingerprint
+                const gitMatch = warperiaContent.match(/^GitFingerprint:\s*(.+)$/m);
+                if (gitMatch) localGitFingerprint = gitMatch[1].trim();
+
+                // WordPressVersion
+                const wpMatch = warperiaContent.match(/^WordPressVersion:\s*(.+)$/m);
+                if (wpMatch) localWordPressVersion = wpMatch[1].trim();
+            }
+
+            // 2) The current backend data
+            const backendVersion = addon.custom_fields.version || "1.0.0";
+            const currentFilename = addon.custom_fields.file.split("/").pop();
+            const currentBackendFilename = addon.custom_fields.file.split('/').pop();
+
+            // 3) Check “Warperia-based” differences
+            let versionCompareResult = semverCompare(backendVersion, localWordPressVersion);
+            let versionIsOutdated = (versionCompareResult > 0); // only if backend > local
+
+            let filenameIsOutdated = (
+                storedFilename !== currentFilename ||
+                storedFilename !== currentBackendFilename
+            );
+
+            let warperiaOutOfDate = versionIsOutdated || filenameIsOutdated;
+
+            // 4) Check if GitHub-based
+            const isGitHubAddon =
+                addon.custom_fields.website_link?.includes("github.com") &&
+                localGitFingerprint; // we already have a local fingerprint
+
+            let remoteFingerprint = "";
+            let githubOutOfDate = false;
+            if (isGitHubAddon) {
+                try {
+                    // fetch GitHub's latest commit or release
+                    const githubRegex = /https?:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/|$)/;
+                    const match = addon.custom_fields.website_link.match(githubRegex);
+                    if (match) {
+                        const owner = match[1];
+                        const repo = match[2];
+                        const { value } = await fetchGitHubFingerprint(owner, repo, GITHUB_ACCESS_TOKEN);
+                        remoteFingerprint = value;
+                        githubOutOfDate = (remoteFingerprint && remoteFingerprint !== localGitFingerprint);
+                    }
+                } catch (err) {
+                    console.warn("Could not fetch GitHub fingerprint:", err);
                 }
             }
 
-            // Get the current filename from the backend
-            const currentFilename = addon.custom_fields.file.split("/").pop();
+            // 5) If EITHER the Warperia-based checks or the GitHub-based check is true => needs update
+            const needsUpdate = warperiaOutOfDate || githubOutOfDate;
 
-            // Check if the versions differ or if the filenames differ
-            if (currentVersion !== backendVersion || storedFilename !== currentFilename) {
-                // Update the version in the .toc file if necessary
+            if (needsUpdate) {
+                // 6) We’ll bump the .toc version to match the latest backendVersion
                 await window.electron.updateTocVersion(mainFolderPath, backendVersion);
 
-                // Update the .warperia file with the new filename
-                const warperiaContent = `ID: ${addon.id}\nFolders: ${addon.custom_fields.folder_list
-                    .map(([folderName]) => folderName)
-                    .join(",")}\nFilename: ${currentFilename}`;
-                await window.electron.writeFile(warperiaFilePath, warperiaContent);
+                // 7) Rebuild .warperia with everything (Filename, WordPressVersion, GitFingerprint if any)
+                let newWarperiaContent = `ID: ${addon.id}
+    Folders: ${addon.custom_fields.folder_list
+                        .map(([folderName]) => folderName)
+                        .join(",")}
+    Filename: ${currentFilename}
+    WordPressVersion: ${backendVersion}`;
 
-                // Proceed with the usual addon update (reinstallation)
-                await handleInstallAddon(addon, new Event("click"), true); // Reinstall to update
+                let finalFingerprint = localGitFingerprint;
+                if (remoteFingerprint) {
+                    finalFingerprint = remoteFingerprint;
+                }
+                if (finalFingerprint) {
+                    newWarperiaContent += `\nGitFingerprint: ${finalFingerprint}`;
+                }
+
+                await window.electron.writeFile(warperiaFilePath, newWarperiaContent);
+
+                // 8) Now do the usual reinstall
+                await handleInstallAddon(addon, new Event("click"), true);
+
             } else {
                 showToastMessage(
                     `The addon is already up-to-date: v${currentVersion}`,
                     "info"
                 );
             }
+
         } catch (error) {
             console.error(`Error updating addon "${addon.title}":`, error);
             showToastMessage(`Failed to update "${addon.title}".`, "danger");
@@ -1707,31 +2318,45 @@ const AddonsPage = ({
 
     const handleUpdateAllAddons = async () => {
         try {
-            // Filter the addons that need updating
+            // 1) Gather all addons needing update
             const addonsToUpdate = Object.values(installedAddons).filter((addon) => {
-                const installedVersion = addon.localVersion || "0.0.0"; // Local .toc version
-                const backendVersion = addon.custom_fields.version || "0.0.0"; // Backend version
-                const currentFilename = addon.custom_fields.file.split("/").pop();
-                const storedFilename = addon.storedFilename || "";
+                // Local vs. backend versions
+                const installedVersion = addon.localVersion || "0.0.0";
+                const backendVersion = addon.custom_fields?.version || "0.0.0";
+                // Compare semver => if backend > local => versionIsOutdated
+                const versionCompare = semverCompare(backendVersion, installedVersion);
+                const versionIsOutdated = versionCompare > 0;
 
-                // Needs update if versions differ or filenames differ
-                return backendVersion !== installedVersion || storedFilename !== currentFilename;
+                // Filenames
+                const currentFilename = (addon.custom_fields?.file || "").split("/").pop();
+                const storedFilename = addon.storedFilename || "";
+                const fileIsOutdated = !!(storedFilename && currentFilename && storedFilename !== currentFilename);
+
+                // GitHub or corrupted flags
+                const hasGitHubUpdate = !!addon.gitNeedsUpdate;
+                const isCorrupted = !!addon.corrupted;
+
+                // If ANY are true => we consider it needing an update
+                return (versionIsOutdated || fileIsOutdated || hasGitHubUpdate || isCorrupted);
             });
 
+            // 2) If none need updating, bail out
             if (addonsToUpdate.length === 0) {
                 showToastMessage("No addons need updating.", "info");
                 return;
             }
 
+            // 3) Mark we’re downloading
             setDownloading(true);
 
-            // Update each addon that requires an update
+            // 4) Update each addon that requires an update
             for (const addon of addonsToUpdate) {
-                await handleUpdateAddon(addon); // Call the update function for each addon
+                await handleUpdateAddon(addon);
             }
 
+            // 5) Success message + refresh
             showToastMessage("All addons updated successfully.", "success");
-            await checkInstalledAddons(gameDir); // Refresh the installed addons
+            await checkInstalledAddons(gameDir);  // Re-scan installed addons
         } catch (error) {
             console.error("Error updating all addons:", error);
             showToastMessage("Failed to update all addons.", "danger");
@@ -1741,12 +2366,13 @@ const AddonsPage = ({
     };
 
     const showToastMessage = useCallback((message, type) => {
-        const newToast = { id: Date.now(), message, type };
+        const uniqueId = `${Date.now()}-${Math.random()}`;
+        const newToast = { id: uniqueId, message, type };
         setToasts((prevToasts) => [...prevToasts, newToast]);
 
         setTimeout(() => {
             setToasts((prevToasts) =>
-                prevToasts.filter((toast) => toast.id !== newToast.id)
+                prevToasts.filter((toast) => toast.id !== uniqueId)
             );
         }, 5000);
     }, []);
@@ -1928,20 +2554,44 @@ const AddonsPage = ({
 
         // Sort addons needing updates to the top
         const sortedAddons = uniqueAddons.sort((a, b) => {
-            const aVersion = a.localVersion || "0.0.0";
-            const bVersion = b.localVersion || "0.0.0";
-            const aNeedsUpdate =
-                (a.custom_fields?.version && a.custom_fields.version !== aVersion) ||
-                (a.storedFilename && a.custom_fields?.file && a.storedFilename !== a.custom_fields.file.split("/").pop()) ||
-                a.corrupted;
-            const bNeedsUpdate =
-                (b.custom_fields?.version && b.custom_fields.version !== bVersion) ||
-                (b.storedFilename && b.custom_fields?.file && b.storedFilename !== b.custom_fields.file.split("/").pop()) ||
-                b.corrupted;
+            // 1) Local versions
+            const aLocalVersion = a.localVersion || "0.0.0";
+            const bLocalVersion = b.localVersion || "0.0.0";
 
-            if (aNeedsUpdate && !bNeedsUpdate) return -1;
-            if (!aNeedsUpdate && bNeedsUpdate) return 1;
-            return 0;
+            // 2) Backend versions
+            const aBackendVersion = a.custom_fields?.version || "0.0.0";
+            const bBackendVersion = b.custom_fields?.version || "0.0.0";
+
+            // 3) Filenames
+            const aBackendFilename = a.custom_fields?.file?.split("/")?.pop() || "";
+            const bBackendFilename = b.custom_fields?.file?.split("/")?.pop() || "";
+            const aLocalFilename = a.storedFilename || "";
+            const bLocalFilename = b.storedFilename || "";
+
+            // 4) Helper: does addon need an update?
+            const needsUpdate = (addon, localVer, backendVer, localFile, backendFile) => {
+                // Compare versions: if backendVer is strictly greater => out of date
+                const verCompare = semverCompare(backendVer, localVer);
+                const versionIsOutdated = (verCompare > 0); // only if backend > local
+
+                // Compare filenames
+                const fileIsOutdated = !!(localFile && backendFile && localFile !== backendFile);
+
+                // Or the addon might be flagged as corrupted
+                const isCorrupted = !!addon.corrupted;
+
+                // If ANY are true => needs update
+                return versionIsOutdated || fileIsOutdated || isCorrupted;
+            };
+
+            // 5) Evaluate for a and b
+            const aNeedsUpdate = needsUpdate(a, aLocalVersion, aBackendVersion, aLocalFilename, aBackendFilename);
+            const bNeedsUpdate = needsUpdate(b, bLocalVersion, bBackendVersion, bLocalFilename, bBackendFilename);
+
+            // 6) Sort so that those needing an update appear at the top
+            if (aNeedsUpdate && !bNeedsUpdate) return -1;   // a first
+            if (!aNeedsUpdate && bNeedsUpdate) return 1;    // b first
+            return 0; // otherwise, keep them in normal order
         });
 
         let finalAddons = sortedAddons;
@@ -1967,7 +2617,6 @@ const AddonsPage = ({
                             <tr>
                                 <th scope="col">Name</th>
                                 <th scope="col">Status</th>
-                                <th scope="col">Latest Version</th>
                                 <th scope="col">Game Version</th>
                                 <th scope="col">Creator</th>
                             </tr>
@@ -1984,12 +2633,6 @@ const AddonsPage = ({
                                     const installedAddon =
                                         Object.values(installedAddons).find((installed) => installed.id === addon.id) || addon;
                                     const installedVersion = installedAddon.localVersion || "N/A";
-                                    const backendVersion = installedAddon.custom_fields?.version || "N/A";
-                                    const needsUpdate =
-                                        (addon.custom_fields?.version && addon.custom_fields.version !== addon.localVersion) ||
-                                        (addon.storedFilename && addon.custom_fields?.file && addon.storedFilename !== addon.custom_fields.file.split("/").pop()) ||
-                                        addon.corrupted;
-                                    const isCorrupted = installedAddon.corrupted;
                                     const addonImage = installedAddon.featured_image
                                         ? installedAddon.featured_image
                                         : "public/default-image.jpg";
@@ -2001,30 +2644,27 @@ const AddonsPage = ({
                                     const childAddons = findChildAddons(installedAddon, installedAddons);
                                     const isExpanded = expandedAddons.includes(installedAddon.id);
 
+                                    // 1) Grab local vs. backend versions
+                                    const localVersion = installedAddon.localVersion || "0.0.0";
+                                    const backendVersion = installedAddon.custom_fields?.version || "0.0.0";
+                                    const verCompare = semverCompare(backendVersion, localVersion);
+                                    const versionIsOutdated = (verCompare > 0); // Only "outdated" if backend > local
+
+                                    // 2) Check filenames
+                                    const localFile = installedAddon.storedFilename || "";
+                                    const backendFile = installedAddon.custom_fields?.file?.split("/")?.pop() || "";
+                                    const fileIsOutdated = !!(localFile && backendFile && localFile !== backendFile);
+
+                                    // 3) Check corruption or GitHub update flags
+                                    const isCorrupted = !!installedAddon.corrupted;
+                                    const hasGitHubUpdate = !!installedAddon.gitNeedsUpdate;
+
+                                    // 4) Combine them
+                                    const finalNeedsUpdate = versionIsOutdated || fileIsOutdated || isCorrupted || hasGitHubUpdate;
+
                                     // Build statusContent
                                     let statusContent;
-                                    if (isCorrupted) {
-                                        statusContent = (
-                                            <button
-                                                className="btn btn-primary"
-                                                onClick={(e) => handleInstallAddon(installedAddon, e, true)}
-                                                disabled={downloading && installingAddonId === installedAddon.id}
-                                            >
-                                                {downloading && installingAddonId === installedAddon.id ? (
-                                                    <>
-                                                        <span
-                                                            className="spinner-border spinner-border-sm me-1"
-                                                            role="status"
-                                                            aria-hidden="true"
-                                                        ></span>
-                                                        Updating...
-                                                    </>
-                                                ) : (
-                                                    "Update"
-                                                )}
-                                            </button>
-                                        );
-                                    } else if (needsUpdate) {
+                                    if (finalNeedsUpdate) {
                                         statusContent = (
                                             <button
                                                 className="btn btn-primary"
@@ -2047,15 +2687,20 @@ const AddonsPage = ({
                                         );
                                     } else {
                                         statusContent = (
-                                            <span className="text-muted fw-medium">
-                                                <i className="bi bi-check-circle-fill text-success me-1"></i> Updated
-                                            </span>
+                                            <Tippy
+                                                content="You have the latest version installed"
+                                                placement="auto"
+                                                className="custom-tooltip"
+                                            >
+                                                <span className="text-muted fw-medium">
+                                                    <i className="bi bi-check-circle-fill text-success me-1"></i> Updated
+                                                </span>
+                                            </Tippy>
                                         );
                                     }
 
                                     return (
                                         <React.Fragment key={installedAddon.id}>
-                                            {/* Primary row for the parent addon */}
                                             <tr
                                                 onContextMenu={(e) => handleRightClick(e, installedAddon)}
                                                 onClick={() => handleViewAddon(installedAddon)}
@@ -2086,7 +2731,6 @@ const AddonsPage = ({
                                                                         <span className="visually-hidden">Loading...</span>
                                                                     </div>
                                                                 )}
-                                                                {/* Expand/Collapse caret, only if childAddons exist */}
                                                                 {childAddons.length > 0 && (
                                                                     <Tippy
                                                                         content="Show dependencies"
@@ -2143,16 +2787,13 @@ const AddonsPage = ({
                                                     </div>
                                                 </td>
                                                 <td>{statusContent}</td>
-                                                <td className="text-muted fw-medium text-truncate">
-                                                    {backendVersion}
-                                                </td>
                                                 <td className="text-muted fw-medium">{gameVersion}</td>
                                                 <td className="text-muted fw-medium">
                                                     {renderAddonAuthor(installedAddon, true)}
                                                 </td>
                                             </tr>
 
-                                            {/* Accordion row for child addons (sub‐addons) */}
+                                            {/* Accordion row for sub‐addons */}
                                             {childAddons.length > 0 && isExpanded && (
                                                 <tr>
                                                     <td colSpan={5} style={{ background: "#1b1b1b" }}>
@@ -2163,7 +2804,6 @@ const AddonsPage = ({
                                                                     <strong>{decodeHtmlEntities(installedAddon.title)}</strong>:
                                                                 </small>
                                                             </div>
-                                                            {/* Render each child as a smaller "subrow" but keep the same columns for consistency */}
                                                             <table className="table table-sm table-dark-subaddons mb-0">
                                                                 <tbody>
                                                                     {childAddons.map((child) => {
@@ -2278,30 +2918,40 @@ const AddonsPage = ({
                                             className="btn btn-primary"
                                             onClick={handleUpdateAllAddons}
                                             disabled={
-                                                Object.values(installedAddons).filter((addon) => {
-                                                    const installedVersion = addon.localVersion || "0.0.0";
-                                                    const backendVersion = addon.custom_fields.version || "0.0.0";
-                                                    const currentFilename = addon.custom_fields.file.split("/").pop();
-                                                    const storedFilename = addon.storedFilename || "";
+                                                Object.values(installedAddons)
+                                                    .filter((addon) => {
+                                                        const installedVersion = addon.localVersion || "0.0.0";
+                                                        const backendVersion = addon.custom_fields.version || "0.0.0";
+                                                        const versionIsOutdated = semverCompare(backendVersion, installedVersion) > 0;
 
-                                                    // Disable the button if no addons need an update
-                                                    return backendVersion !== installedVersion || storedFilename !== currentFilename;
-                                                }).length === 0 || downloading
+                                                        const currentFilename = addon.custom_fields.file.split("/").pop();
+                                                        const storedFilename = addon.storedFilename || "";
+                                                        const fileIsOutdated = storedFilename && storedFilename !== currentFilename;
+
+                                                        const isCorrupted = !!addon.corrupted;
+                                                        const hasGitHubUpdate = !!addon.gitNeedsUpdate;
+
+                                                        return (
+                                                            versionIsOutdated ||
+                                                            fileIsOutdated ||
+                                                            isCorrupted ||
+                                                            hasGitHubUpdate
+                                                        );
+                                                    })
+                                                    .length === 0
+                                                || downloading
                                             }
                                         >
                                             {downloading ? (
                                                 <>
-                                                    <span
-                                                        className="spinner-border spinner-border-sm me-1"
-                                                        role="status"
-                                                        aria-hidden="true"
-                                                    ></span>
-                                                    <span>Updating...</span>
+                                                    <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" />
+                                                    Updating...
                                                 </>
                                             ) : (
                                                 "Update All"
                                             )}
                                         </button>
+
                                     </span>
                                 </Tippy>
                                 <div className="ms-auto d-flex gap-2">

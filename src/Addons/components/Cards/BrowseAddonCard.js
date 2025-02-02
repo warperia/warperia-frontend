@@ -25,8 +25,8 @@ const BrowseAddonCard = ({
   const needsUpdate = installedAddon && installedVersion !== backendVersion;
   const buttonText = installedAddon
     ? needsUpdate
-      ? "Update"
-      : "Up to date"
+      ? "Installed"
+      : "Installed"
     : "Install";
 
   // Determine if the current addon is being installed or updated
@@ -125,16 +125,16 @@ const BrowseAddonCard = ({
                     type="button"
                     className={`btn position-relative rounded-0 ${installedAddon
                       ? needsUpdate
-                        ? "btn-update btn-primary"
+                        ? "btn-installed text-muted"
                         : "btn-installed text-muted"
                       : "btn-primary"
                       }`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (installedAddon) {
-                        if (needsUpdate) {
-                          handleUpdateAddon(addon);
-                        }
+                        // if (needsUpdate) {
+                        //   handleUpdateAddon(addon);
+                        // }
                         // If it's installed but does NOT need an update, we do nothing on click
                       } else {
                         // If not installed, handle install
