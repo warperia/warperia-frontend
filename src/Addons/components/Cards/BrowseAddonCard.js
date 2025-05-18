@@ -43,8 +43,23 @@ const BrowseAddonCard = ({
   };
   const gameVersion = postTypeVersionMap[addon.post_type] || addon.post_type;
 
-  // Get the categories from the addon
-  const categories = (addon.addon_categories || []).map(category => decodeHtmlEntities(category));
+  // Get the categories from the addon - handle different data structures
+  let categories = [];
+  if (Array.isArray(addon.addon_categories)) {
+    categories = addon.addon_categories.map(category => decodeHtmlEntities(category));
+  } else if (addon.addon_categories && typeof addon.addon_categories === 'string') {
+    try {
+      const parsedCategories = JSON.parse(addon.addon_categories);
+      categories = Array.isArray(parsedCategories) 
+        ? parsedCategories.map(category => decodeHtmlEntities(category))
+        : [];
+    } catch (e) {
+      categories = addon.addon_categories.split(',').map(category => decodeHtmlEntities(category.trim()));
+    }
+  } else if (addon.categories && Array.isArray(addon.categories)) {
+    categories = addon.categories.map(category => decodeHtmlEntities(category.name));
+  }
+  
   const maxCategoriesToShow = 3;
   const categoriesToShow = categories.slice(0, maxCategoriesToShow);
   const remainingCategories = categories.slice(maxCategoriesToShow);
@@ -156,12 +171,16 @@ const BrowseAddonCard = ({
             <div className="categories">
               <ul>
                 <li className="name">Categories</li>
-                {categoriesToShow.map((category, index) => (
-                  <React.Fragment key={category}>
-                    <li>{category}</li>
-                    {index < categoriesToShow.length - 1 && <span className="separator">|</span>}
-                  </React.Fragment>
-                ))}
+                {categoriesToShow.length > 0 ? (
+                  categoriesToShow.map((category, index) => (
+                    <React.Fragment key={category}>
+                      <li>{category}</li>
+                      {index < categoriesToShow.length - 1 && <span className="separator">|</span>}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <li className="text-muted">None</li>
+                )}
                 {remainingCategories.length > 0 && (
                   <Tippy
                     content={remainingCategories.join(", ")}

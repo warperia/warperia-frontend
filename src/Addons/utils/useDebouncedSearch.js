@@ -26,23 +26,10 @@ const useDebouncedSearch = (setLoading, setAddons, setTotalPages, setCurrentPage
           setAddons(response.data);
           setTotalPages(parseInt(response.headers['x-wp-totalpages']) || 1);
           setCurrentPage(1);
-        } else {
-          // Fetch addons without search when the search query is cleared, ensuring correct sorting is applied
-          const params = {
-            page: 1,
-            per_page: pageSize,
-            addon_category: selectedCategories.length > 0 ? selectedCategories.map(option => option.value).join(',') : undefined,
-            post_type: currentPostType,
-            orderby: selectedSorting.value, // Ensure the selected sorting is applied
-          };
-
-          const response = await axios.get(`${WEB_URL}/wp-json/wp/v2/addons/search-nested`, {
-            params,
-          });
-
-          setAddons(response.data);
-          setTotalPages(parseInt(response.headers['x-wp-totalpages']) || 1);
-          setCurrentPage(1);
+        } else if (value.length === 0) {
+          clearTimeout(loadingTimeout);
+          setLoading(false);
+          return;
         }
 
         if (activeTab !== 'browseAddons') {

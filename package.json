@@ -1,6 +1,6 @@
 {
   "name": "warperia",
-  "version": "1.1.4",
+  "version": "1.1.7",
   "description": "World of Warcraft Private Servers Addon Manager Application",
   "main": "src/main.cjs",
   "scripts": {
@@ -123,7 +123,6 @@
     "stream-browserify": "^3.0.0",
     "swiper": "^11.1.9",
     "unzipper": "^0.12.3",
-    "util": "^0.12.5",
     "uuid": "^11.0.3",
     "win-version-info": "^6.0.1",
     "yaml": "^2.6.0"

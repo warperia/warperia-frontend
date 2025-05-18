@@ -38,6 +38,14 @@ try {
     },
 
     // --------------------------------
+    // GITHUB FINGERPRINT
+    // --------------------------------
+    fetchGitHubFingerprint: (owner, repo) =>
+      ipcRenderer.invoke('fetch-github-fingerprint', owner, repo),
+    fetchGitHubDefaultBranch: (owner, repo) =>
+      ipcRenderer.invoke('fetch-github-default-branch', owner, repo),
+
+    // --------------------------------
     // DOWNLOAD FILES
     // --------------------------------
     downloadFile: async (url, savePath) => {
@@ -131,20 +139,20 @@ try {
       const { spawn } = require('child_process');
       const fs = require('fs');
       const path = require('path');
-    
+
       if (!fs.existsSync(exePath)) {
         throw new Error('Executable file not found.');
       }
-    
+
       // Backup Config.wtf before launching the game
       const configPath = path.join(path.dirname(exePath), 'WTF', 'Config.wtf');
       const backupPath = path.join(path.dirname(exePath), 'WTF', 'Config.wtf.backup');
-    
+
       if (fs.existsSync(configPath)) {
         fs.copyFileSync(configPath, backupPath);
         console.log('[MODIFICATIONS] Created backup of Config.wtf');
       }
-    
+
       // Launch the game
       const processInstance = spawn(exePath, [], {
         detached: true,
@@ -296,13 +304,23 @@ try {
       try {
         const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
         const files = entries
-          .filter(entry => entry.isFile() && (entry.name.endsWith('.lua') || entry.name.endsWith('.toc') || entry.name.endsWith('.blp') || entry.name.endsWith('.xml') || entry.name.endsWith('.tga') || entry.name.endsWith('.ttf')))
+          .filter(entry => entry.isFile()) // Include all files regardless of extension
           .map(file => file.name);
         const directories = entries.filter(entry => entry.isDirectory()).map(entry => entry.name);
 
         return { files, directories }; // Return both files and directories
       } catch (err) {
         console.error("Error reading directory and files:", err);
+        throw err;
+      }
+    },
+
+    readBinaryFile: async (filePath) => {
+      try {
+        const data = await fs.promises.readFile(filePath);
+        return data;
+      } catch (err) {
+        console.error('Error reading binary file:', err);
         throw err;
       }
     },

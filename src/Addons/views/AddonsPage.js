@@ -20,6 +20,8 @@ import useDebouncedSearch from "./../utils/useDebouncedSearch.js";
 import { WEB_URL } from "./../../config.js";
 import { GITHUB_TOKEN } from "./../../config.js";
 import cleanupDownload from "../utils/cleanupDownload.js";
+import handleAddonInstallation from "../utils/handleAddonInstallation.js";
+import checkInstalledAddons from "../utils/checkInstalledAddons.js";
 
 // Stylesheets
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -145,6 +147,7 @@ const AddonsPage = ({
     const [progress, setProgress] = useState(0);
     const [autoProgressTimer, setAutoProgressTimer] = useState(null);
     const [artificialProgress, setArtificialProgress] = useState(0);
+    const [queuedAddons, setQueuedAddons] = useState([]);
 
     // Toggle the accordion open/close for a given addon ID.
     function toggleAddonExpansion(addonId) {
@@ -236,7 +239,7 @@ const AddonsPage = ({
                 }
 
                 setGameDir(sanitizedPath);
-                await checkInstalledAddons(sanitizedPath);
+                await scanForInstalledAddons(sanitizedPath);
             } catch (error) {
                 console.error("Failed to initialize game directory:", error);
             } finally {
@@ -282,7 +285,7 @@ const AddonsPage = ({
     // Refresh the user's installed addons
     const refreshAddonsData = async (zipPath) => {
         setAllAddons([]);
-        await checkInstalledAddons(gameDir);
+        await scanForInstalledAddons(gameDir);
         if (zipPath) {
             await cleanupDownload(zipPath);
         }
@@ -364,7 +367,7 @@ const AddonsPage = ({
             );
         } else if (activeTab === "myAddons") {
             if (gameDir) {
-                checkInstalledAddons(gameDir);
+                scanForInstalledAddons(gameDir);
             }
         }
     }, [
@@ -481,7 +484,7 @@ const AddonsPage = ({
         setSearchQuery(value);
 
         if (value === "") {
-            // Restore the previous sorting and page after clearing the search
+            // Restore the original page and sorting after clearing search
             setSelectedSorting(previousSorting);
             setCurrentPage(previousPage);
             fetchAddonsData(
@@ -491,9 +494,11 @@ const AddonsPage = ({
                 previousSorting.value
             );
         } else {
-            // Store the current page and sorting before searching
-            setPreviousPage(currentPage);
-            setPreviousSorting(selectedSorting);
+            // Only update previous page/sorting when starting new search
+            if (searchQuery === "") {
+                setPreviousPage(currentPage);
+                setPreviousSorting(selectedSorting);
+            }
             debouncedSearch(value, pageSize);
         }
     };
@@ -664,7 +669,7 @@ const AddonsPage = ({
             const destFilePath = window.electron.pathJoin(dest, file);
     
             // Read & write
-            const content = await window.electron.readFile(srcFilePath);
+            const content = await window.electron.readBinaryFile(srcFilePath);
             await window.electron.overwriteFile(destFilePath, content);
         }
     
@@ -690,7 +695,7 @@ const AddonsPage = ({
             const newFilePath = window.electron.pathJoin(dstFolder, file);
     
             // Copy file content
-            const fileContent = await window.electron.readFile(oldFilePath);
+            const fileContent = await window.electron.readBinaryFile(oldFilePath);
             await window.electron.overwriteFile(newFilePath, fileContent);
     
             // Optionally delete the old file
@@ -795,7 +800,7 @@ const AddonsPage = ({
             clearInterval(autoProgressTimer);
             setAutoProgressTimer(null);
         }
-        // Initialize progress at 10 (or whatever start you want)
+        // Initialize progress at 10
         setArtificialProgress(10);
         // Increment up to ~90 over time, so user sees progress moving
         const timerId = setInterval(() => {
@@ -815,7 +820,6 @@ const AddonsPage = ({
             clearInterval(autoProgressTimer);
             setAutoProgressTimer(null);
         }
-        // Immediately set it to finalValue if you want 100% on done
         setArtificialProgress(finalValue);
     };
 
@@ -875,857 +879,64 @@ const AddonsPage = ({
         return 0;
     }
 
-
-    const handleInstallAddon = async (addon, event, isReinstall = false, skipBundledCheck = false) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        setShowDeleteModal(false);
-        setDeleteModalData({ addon: null, parents: [], children: [] });
-
-        if (!gameDir) {
-            showToastMessage(
-                "Your game directory is not configured for this expansion.",
-                "danger"
-            );
-            return;
-        }
-
-        const addonUrl = addon.custom_fields.file;
-        if (!addonUrl) {
-            showToastMessage(
-                "The source URL for this addon couldn't be found.",
-                "danger"
-            );
-            return;
-        }
-
-        const absoluteGameDir = window.electron.pathResolve(gameDir);
-        const installPath = window.electron.pathJoin(
-            absoluteGameDir,
-            "Interface",
-            "AddOns"
-        );
-        const addonTitle = normalizeTitle(
-            addon.custom_fields.title_toc || addon.title
-        );
-
-        // Validate installPath
-        if (!isPathInsideDirectory(installPath, absoluteGameDir)) {
-            console.error("Invalid installation path:", installPath);
-            showToastMessage("Invalid game directory.", "danger");
-            return;
-        }
-
-        let modalShown = false;
-
-        // Auto-skip bundled check for reinstalls
-        if (isReinstall) {
-            skipBundledCheck = true;
-        }
-
-        let gitFingerprint = null;
-
-        try {
-            setDownloading(true);
-            setInstallingAddonId(addon.id);
-            setInstallingAddonStep("Deleting previous folders");
-
-            // ----------------------------------------------------------------------------------
-            // Step 1: Handle Variations
-            // ----------------------------------------------------------------------------------
-            let mainAddon = addon;
-            const isVariation = addon.custom_fields.variation;
-
-            if (isVariation && isVariation !== "0") {
-                // Fetch main addon if installing a variation
-                const mainAddonResponse = await axios.get(
-                    `${WEB_URL}/wp-json/wp/v2/${currentExpansion}-addons/${isVariation}`
-                );
-                mainAddon = mainAddonResponse.data;
-            }
-
-            // Get variations from the MAIN addon
-            const hasVariations = mainAddon.custom_fields?.has_variations || [];
-            const relatedAddons = parseSerializedPHPArray(hasVariations);
-
-            // Check if the main addon or any of its variations have bundled addons
-            const currentlyInstalledAddon = Object.values(installedAddons).find(
-                (installed) => {
-                    // Check if the installed addon is the main addon or one of its variations
-                    return (
-                        installed.id === mainAddon.id ||
-                        relatedAddons.includes(installed.id)
-                    );
-                }
-            );
-
-            // ----------------------------------------------------------------------------------
-            // Step 2: Optional Bundled Addons Check
-            // ----------------------------------------------------------------------------------
-            if (!skipBundledCheck) {
-                // Check if main addon/variations have bundled addons
-                const allAddonsToCheck = [
-                    mainAddon,
-                    ...relatedAddons.map((id) => allAddons.find((a) => a.id === id)),
-                ];
-                const bundledAddons = allAddonsToCheck.flatMap((parentAddon) => {
-                    return findChildAddons(parentAddon, installedAddons).filter(
-                        (child) => {
-                            // Only consider children that are EXCLUSIVE to this parent
-                            const childParents = findParentAddons(child, installedAddons);
-                            return childParents.some((p) => p.id === parentAddon.id);
-                        }
-                    );
-                });
-
-                const findStandaloneCopies = (mainAddon, installedAddons) => {
-                    // Get main addon's root parent
-                    const getRootParent = (addon) => {
-                        if (addon.custom_fields?.variation && addon.custom_fields.variation !== "0") {
-                            const parent = allAddons.find(
-                                (a) => a.id === parseInt(addon.custom_fields.variation)
-                            );
-                            return parent ? getRootParent(parent) : addon;
-                        }
-                        return addon;
-                    };
-
-                    const mainRoot = getRootParent(mainAddon);
-
-                    return [
-                        ...new Set(
-                            Object.values(installedAddons).filter((installed) => {
-                                const installedRoot = getRootParent(installed);
-                                return (
-                                    installedRoot.id !== mainRoot.id &&
-                                    installed.custom_fields.folder_list.some(([f]) =>
-                                        mainAddon.custom_fields.folder_list.some(
-                                            ([mf]) => mf === f
-                                        )
-                                    )
-                                );
-                            })
-                        ),
-                    ];
-                };
-
-                if (bundledAddons.length > 0) {
-                    setDeleteModalData({
-                        addon: currentlyInstalledAddon,
-                        newAddon: mainAddon,
-                        parents: [],
-                        children: bundledAddons,
-                        isInstallation: true,
-                        standaloneAddons: findStandaloneCopies(mainAddon, installedAddons),
-                    });
-                    setShowDeleteModal(true);
-                    setShowModal(false);
-                    return;
-                }
-            }
-
-            // ----------------------------------------------------------------------------------
-            // Step 2.5: Delete existing folders from main addon + all variations
-            // ----------------------------------------------------------------------------------
-            const addonsToDelete = [mainAddon.id, ...relatedAddons];
-            await Promise.all(
-                addonsToDelete.map(async (relatedAddonId) => {
-                    const installedAddon = Object.values(installedAddons).find(
-                        (installed) => installed.id === parseInt(relatedAddonId, 10)
-                    );
-
-                    if (installedAddon) {
-                        const foldersToDelete = installedAddon.custom_fields.folder_list.map(
-                            ([folderName]) => folderName
-                        );
-
-                        await Promise.all(
-                            foldersToDelete.map(async (folder) => {
-                                const folderPath = window.electron.pathJoin(
-                                    installPath,
-                                    folder
-                                );
-
-                                // Get ALL installed addons using this folder
-                                const folderUsers = Object.values(installedAddons).filter(
-                                    (inst) =>
-                                        inst.custom_fields.folder_list.some(
-                                            ([f]) => f === folder
-                                        )
-                                );
-
-                                const isSameFamily = folderUsers.some((inst) => {
-                                    // Recursive family check
-                                    const getRootParent = (addon) => {
-                                        if (
-                                            addon.custom_fields?.variation &&
-                                            addon.custom_fields.variation !== "0"
-                                        ) {
-                                            const parent = allAddons.find(
-                                                (a) =>
-                                                    a.id ===
-                                                    parseInt(addon.custom_fields.variation)
-                                            );
-                                            return parent ? getRootParent(parent) : addon;
-                                        }
-                                        return addon;
-                                    };
-
-                                    const installedRoot = getRootParent(inst);
-                                    const mainAddonRoot = getRootParent(mainAddon);
-
-                                    return installedRoot.id === mainAddonRoot.id;
-                                });
-
-                                if (!isSameFamily) {
-                                    return; // Skip deletion
-                                }
-
-                                // Validate folderPath
-                                if (!isPathInsideDirectory(folderPath, installPath)) {
-                                    console.error(
-                                        "Attempted path traversal attack detected:",
-                                        folderPath
-                                    );
-                                    showToastMessage("Invalid folder path.", "danger");
-                                    return;
-                                }
-
-                                // Check if folder is used by other installed addons
-                                const isFolderUsed = Object.values(installedAddons).some(
-                                    (ia) =>
-                                        ia.id !== installedAddon.id &&
-                                        ia.custom_fields.folder_list.some(
-                                            ([f]) => f === folder
-                                        )
-                                );
-                                if (isFolderUsed) {
-                                    return; // Skip deletion
-                                }
-
-                                // Attempt to delete the folder and confirm deletion
-                                let deleteSuccess = false;
-                                for (let attempt = 0; attempt < 2; attempt++) {
-                                    await window.electron.deleteFolder(folderPath);
-                                    setInstallingAddonStep(`Deleting old folders`);
-
-                                    // Check if the folder still exists using fileExists
-                                    if (
-                                        !(await window.electron.fileExists(folderPath))
-                                    ) {
-                                        deleteSuccess = true;
-                                        break;
-                                    } else {
-                                        console.warn(
-                                            `Attempt ${attempt + 1
-                                            } to delete folder ${folderPath} failed. Retrying...`
-                                        );
-                                        // Short delay before retry
-                                        await new Promise((resolve) =>
-                                            setTimeout(resolve, 200)
-                                        );
-                                    }
-                                }
-
-                                if (!deleteSuccess) {
-                                    showToastMessage(
-                                        `Failed to delete folder: ${folderPath}`,
-                                        "danger"
-                                    );
-                                }
-                            })
-                        );
-                    }
-                })
-            );
-
-            // ----------------------------------------------------------------------------------
-            // Step 3: Download and extract the new addon
-            // IMPORTANT: responseType is "blob" so .arrayBuffer() works in Electron
-            // ----------------------------------------------------------------------------------
-            setInstallingAddonStep("Downloading addon...");
-
-            let contentLength = 0;
-            let response;
-            let fileName;
-            let zipFilePath;
-
-            // Check if there's a GitHub link in website_link
-            const websiteLink = addon.custom_fields.website_link || "";
-
-            if (websiteLink.includes("github.com")) {
-                try {
-                    // Attempt GitHub download
-                    const githubRegex = /https?:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/|$)/;
-                    const match = websiteLink.match(githubRegex);
-
-                    if (!match) {
-                        throw new Error("Invalid GitHub URL format");
-                    }
-
-                    const owner = match[1];
-                    const repo = match[2];
-
-                    // 1) Fetch repo metadata (for default branch)
-                    const repoMeta = await axios.get(
-                        `https://api.github.com/repos/${owner}/${repo}`,
-                        {
-                            headers: {
-                                Authorization: `Bearer ${GITHUB_ACCESS_TOKEN}`,
-                            },
-                        }
-                    );
-                    const defaultBranch = repoMeta.data.default_branch || "main";
-
-                    // 2) Download the repository zip from default branch
-                    const zipUrl = `https://api.github.com/repos/${owner}/${repo}/zipball/${defaultBranch}`;
-                    try {
-                        const headRes = await axios.head(zipUrl, {
-                            headers: {
-                                Authorization: `Bearer ${GITHUB_ACCESS_TOKEN}`,
-                                Accept: "application/vnd.github.v3.raw",
-                            },
-                        });
-                        if (headRes.headers["content-length"]) {
-                            contentLength = parseInt(headRes.headers["content-length"], 10);
-                        } else {
-                            startArtificialProgress();
-                        }
-                    } catch (headError) {
-                        console.warn("[Warperia] HEAD request failed. Falling back to unknown size.");
-                    }
-
-                    // 3) Download the repository zip from default branch
-                    response = await axios.get(zipUrl, {
-                        responseType: "blob",
-                        maxContentLength: Infinity, // prevent large-file truncation
-                        maxBodyLength: Infinity,
-                        headers: {
-                            Authorization: `Bearer ${GITHUB_ACCESS_TOKEN}`,
-                            Accept: "application/vnd.github.v3.raw",
-                        },
-                        onDownloadProgress: (progressEvent) => {
-                            let total = contentLength || progressEvent.total;
-
-                            if (total && total > 0) {
-                                // We know the file size => normal real progress
-                                const percentCompleted = Math.round(
-                                    (progressEvent.loaded * 100) / total
-                                );
-                                // Stop artificial increments & reflect real progress
-                                stopArtificialProgress(percentCompleted);
-                                setProgress(percentCompleted);
-                            } else {
-                                // We do NOT know the file size => use artificial progress
-                                setProgress(artificialProgress);
-                            }
-                        },
-                    });
-
-                    // Once download completes, jump to 100%
-                    stopArtificialProgress(100);
-                    setProgress(100);
-
-                    // We'll name the downloaded file after the addon title
-                    fileName = `${addonTitle.replace(/\s+/g, "_")}.zip`;
-
-                    // Save the file using Electron bridge
-                    zipFilePath = await window.electron.saveZipFile(
-                        response.data,
-                        fileName
-                    );
-
-                    // 3) Attempt to fetch the current GitHub fingerprint (release tag or commit SHA)
-                    try {
-                        const githubRegex = /https?:\/\/github\.com\/([^/]+)\/([^/]+)(?:\/|$)/;
-                        const matchGit = websiteLink.match(githubRegex);
-                        if (matchGit) {
-                            const owner = matchGit[1];
-                            const repo = matchGit[2];
-                            const { type, value } = await fetchGitHubFingerprint(owner, repo, GITHUB_ACCESS_TOKEN);
-                            gitFingerprint = value;
-                        }
-                    } catch (fetchErr) {
-                        console.warn("Failed to fetch GitHub fingerprint:", fetchErr);
-                        // Not fatal; we just won't store anything
-                    }
-
-                } catch (githubError) {
-                    console.warn(
-                        "GitHub download failed. Falling back to original WordPress download:",
-                        githubError
-                    );
-
-                    // Fallback to WordPress zip
-                    response = await axios.get(addonUrl, {
-                        responseType: "blob",
-                        onDownloadProgress: (progressEvent) => {
-                            const percentCompleted = Math.round(
-                                (progressEvent.loaded * 100) / progressEvent.total
-                            );
-                            setProgress(percentCompleted);
-                        },
-                    });
-                    fileName = addonUrl.split("/").pop();
-                    zipFilePath = await window.electron.saveZipFile(
-                        response.data,
-                        fileName
-                    );
-                }
-            } else {
-                // Original WordPress download
-                response = await axios.get(addonUrl, {
-                    responseType: "blob",
-                    onDownloadProgress: (progressEvent) => {
-                        const percentCompleted = Math.round(
-                            (progressEvent.loaded * 100) / progressEvent.total
-                        );
-                        setProgress(percentCompleted);
-                    },
-                });
-                fileName = addonUrl.split("/").pop();
-                zipFilePath = await window.electron.saveZipFile(response.data, fileName);
-            }
-
-            // Record what's in AddOns before extraction
-            const beforeInstallItems = await window.electron.readDir(installPath);
-
-            // Extract into the AddOns folder
-            await window.electron.extractZip(zipFilePath, installPath);
-
-            // ----------------------------------------------------------------------------------
-            // Step 3.5: Rename the newly extracted folder to match the main folder name
-            // IF (and only if) there's exactly one new top-level directory.
-            // ----------------------------------------------------------------------------------
-            setInstallingAddonStep("Restructuring folder...");
-            const mainFolder = addon.custom_fields.folder_list.find(
-                ([_, isMain]) => isMain === "1"
-            );
-            if (!mainFolder) {
-                console.error("Main folder not found in addon data:", addonTitle);
-                showToastMessage(
-                    `Main folder not found for "${addonTitle}"`,
-                    "danger"
-                );
-                throw new Error("Missing mainFolder in custom_fields.folder_list");
-            }
-            const [mainFolderName] = mainFolder;
-
-            // 2) Compare "before" vs. "after" to see only new folders
-            const afterInstallItems = await window.electron.readDir(installPath);
-            const newlyExtractedFolders = afterInstallItems.filter(
-                (item) => !beforeInstallItems.includes(item)
-            );
-
-            // 2) If there's exactly one new parent folder, flatten it so that
-            // all subfolders  end up in AddOns.
-            if (newlyExtractedFolders.length === 1) {
-                const extractedFolderName = newlyExtractedFolders[0];
-                const extractedFolderPath = window.electron.pathJoin(installPath, extractedFolderName);
-
-                // 1) Check if this single folder contains multiple subfolders from the addon folder_list
-                const isMultiFolder = await hasMultipleSubfolders(extractedFolderPath, addon.custom_fields.folder_list);
-
-                if (isMultiFolder) {
-                    // MULTI-FOLDER scenario
-                    // Flatten them all directly into AddOns
-                    await flattenSingleExtractedFolder(extractedFolderPath, installPath);
-                } else {
-                    // SIMPLE SINGLE-FOLDER scenario => do the old rename approach
-                    let finalFolderPath = extractedFolderPath;
-                    if (extractedFolderName !== mainFolderName) {
-                        const oldPath = extractedFolderPath;
-                        const newPath = window.electron.pathJoin(installPath, mainFolderName);
-                    
-                        await copyFolderRecursively(oldPath, newPath);
-                        await window.electron.deleteFolder(oldPath);
-                    
-                        // Now the actual folder is called "mainFolderName"
-                        finalFolderPath = newPath;
-
-                        try {
-                            // 1) Read subfolders from the finalFolderPath
-                            const { directories: subfolders } = await window.electron.readDirAndFiles(finalFolderPath);
-                        
-                            // 2) If there's exactly one subfolder with the *same* name, flatten again:
-                            if (subfolders.length === 1 && subfolders[0] === mainFolderName) {
-                              console.log(`[Warperia] Found a double folder: ${mainFolderName}\\${mainFolderName}. Flattening...`);
-                        
-                              const innerPath = window.electron.pathJoin(finalFolderPath, mainFolderName);
-                              await flattenSingleExtractedFolder(innerPath, finalFolderPath);
-                            }
-                          } catch (err) {
-                            console.warn("Double‐folder check failed:", err);
-                          }
-                      }
-                }
-
-                try {
-                    // Check if the extracted folder exactly matches your mainFolderName
-                    if (extractedFolderName === mainFolderName) {
-                      // Read the subfolders INSIDE that newly renamed folder
-                      const { directories: subfolders } = await window.electron.readDirAndFiles(extractedFolderPath);
-                  
-                      // If there's exactly one subfolder with the same name, flatten again
-                      if (
-                        subfolders.length === 1 &&
-                        subfolders[0] === mainFolderName
-                      ) {
-                        console.log(`[Warperia] Detected a double folder: ${mainFolderName}/${mainFolderName}. Flattening...`);
-                  
-                        // Example approach: flatten the "inner" Auctionator into the "outer"
-                        const innerPath = window.electron.pathJoin(extractedFolderPath, mainFolderName);
-                        await flattenSingleExtractedFolder(innerPath, extractedFolderPath);
-                      }
-                    }
-                  } catch (err) {
-                    console.warn("Error checking for double-nested folder:", err);
-                  }
-            }
-
-
-            // ----------------------------------------------------------------------------------
-            // Clean up top-level GitHub files you don't want in the AddOns folder
-            // (READMEs, .gitignore, etc.)
-            // ----------------------------------------------------------------------------------
-            setInstallingAddonStep("Removing leftover files...");
-            const topLevelExtras = [
-                "README.md",
-                "readme.md",
-                "README.MD",
-                "LICENSE",
-                "LICENSE.md",
-                ".gitignore",
-                ".gitattributes",
-                ".github",
-            ];
-            for (const extra of topLevelExtras) {
-                const extraPath = window.electron.pathJoin(installPath, extra);
-                if (await window.electron.fileExists(extraPath)) {
-                    await window.electron.deleteFolder(extraPath);
-                }
-            }
-
-            // ----------------------------------------------------------------------------------
-            // Step 4: Write the .warperia file + update .toc version
-            // ----------------------------------------------------------------------------------
-            const mainFolderPath = window.electron.pathJoin(
-                installPath,
-                mainFolderName
-            );
-            const tocFilePath = window.electron.pathJoin(
-                mainFolderPath,
-                `${mainFolderName}.toc`
-            );
-
-            // Ensure extraction/renaming is complete before writing the new file
-            await new Promise((resolve) => setTimeout(resolve, 500));
-
-            if (await window.electron.fileExists(tocFilePath)) {
-                const versionFromToc =
-                    (await window.electron.readVersionFromToc(tocFilePath)) || "1.0.0";
-
-                // Double-check that no old data is left before writing the new file
-                const warperiaFilePath = window.electron.pathJoin(
-                    mainFolderPath,
-                    `${mainFolderName}.warperia`
-                );
-
-                const wordPressVersionAtTimeOfInstall = addon.custom_fields.version || '1.0.0';
-                const backendFilename = addon.custom_fields.file.split("/").pop();
-
-                await window.electron.deleteFolder(warperiaFilePath); // Delete old .warperia if exists
-                const warperiaContent = `ID: ${addon.id
-                    }\nFolders: ${addon.custom_fields.folder_list
-                        .map(([folderName]) => folderName)
-                        .join(",")}\nBackendVersion: ${wordPressVersionAtTimeOfInstall}\nFilename: ${backendFilename}\n${gitFingerprint ? `GitFingerprint: ${gitFingerprint}` : ""}`;
-
-                await window.electron.writeFile(warperiaFilePath, warperiaContent);
-
-                // Immediately read back the file to confirm content
-                const writtenContent = await window.electron.readFile(warperiaFilePath);
-                if (writtenContent !== warperiaContent) {
-                    console.error(
-                        "Mismatch in written .warperia file! Expected:",
-                        warperiaContent,
-                        "but got:",
-                        writtenContent
-                    );
-                }
-
-                // Compare versionFromToc vs. wordPressVersionAtTimeOfInstall
-                let finalTocVersion = versionFromToc;
-                const compareResult = semverCompare(versionFromToc, wordPressVersionAtTimeOfInstall);
-                if (compareResult < 0) {
-                    finalTocVersion = wordPressVersionAtTimeOfInstall;
-                }
-                await window.electron.updateTocVersion(mainFolderPath, finalTocVersion);
-
-            } else {
-                // If the .toc wasn't found in the newly renamed folder:
-                console.warn(
-                    `No .toc file found in main folder "${mainFolderName}", defaulting to version 1.0.0.`
-                );
-            }
-
-            // ----------------------------------------------------------------------------------
-            // Step 5: Cleanup and finalize installation
-            // ----------------------------------------------------------------------------------
-            await cleanupDownload(zipFilePath);
-            await updateAddonInstallStats(addon.id, addon.type);
-            await refreshAddonsData();
-            showToastMessage(
-                `Your addon was ${isReinstall ? "reinstalled" : "installed"}!`,
-                "success"
-            );
-        } catch (error) {
-            console.error("Error installing addon:", error);
-            showToastMessage(`The addon couldn't be installed: ${error.message}`, "danger");
-        } finally {
-            setDownloading(false);
-            setInstallingAddonId(null);
-            setInstallingAddonStep(null);
-            setProgress(0);
-            stopArtificialProgress(0);
-        }
+    const handleInstallAddon = async (addon, event, isReinstall = false, skipBundledCheck = false, options = {}) => {
+        const params = {
+            setShowDeleteModal,
+            setDeleteModalData,
+            gameDir,
+            semverCompare,
+            showToastMessage,
+            isPathInsideDirectory,
+            setDownloading,
+            setInstallingAddonId,
+            setInstallingAddonStep,
+            installedAddons,
+            window,
+            normalizeTitle,
+            parseSerializedPHPArray,
+            findChildAddons,
+            findParentAddons,
+            allAddons,
+            setProgress,
+            startArtificialProgress,
+            stopArtificialProgress,
+            artificialProgress,
+            fetchGitHubFingerprint,
+            setShowModal,
+            currentExpansion,
+            serverId,
+            setInstalledAddons,
+            hasMultipleSubfolders,
+            refreshAddonsData,
+            flattenSingleExtractedFolder,
+            copyFolderRecursively,
+            queuedAddons,
+            ...options
+        };
+        return await handleAddonInstallation(addon, event, isReinstall, skipBundledCheck, params);
     };
 
-    const checkInstalledAddons = async (gamePath) => {
-        try {
-            setScanningAddons(true);
-
-            // 1) Normalize the path to Interface/AddOns
-            const absoluteGameDir = window.electron.pathResolve(gamePath);
-            const addonsDir = window.electron.pathJoin(absoluteGameDir, "Interface", "AddOns");
-
-            // 2) Validate that the addonsDir is inside the gameDir
-            if (!isPathInsideDirectory(addonsDir, absoluteGameDir)) {
-                console.error("Invalid game directory:", addonsDir);
-                showToastMessage("Invalid game directory.", "danger");
-                return;
-            }
-
-            // 3) Get all top-level folders in the AddOns directory
-            const addonFolders = await window.electron.readDir(addonsDir);
-
-            // 4) Make sure we have the full list of allAddons; if not, fetch them in batches
-            let fetchedAddons = allAddons;
-            if (!fetchedAddons || fetchedAddons.length === 0) {
-                let currentPage = 1;
-                const pageSize = 100;
-                let totalPages = 1;
-
-                do {
-                    const { data: batchAddons, totalPages: fetchedTotalPages } =
-                        await fetchAddons(
-                            `${currentExpansion}`, // Post type or expansion
-                            currentPage,
-                            "",
-                            [],
-                            pageSize
-                        );
-                    fetchedAddons = [...fetchedAddons, ...batchAddons];
-                    totalPages = fetchedTotalPages || 1;
-                    currentPage++;
-                } while (currentPage <= totalPages);
-
-                setAllAddons(fetchedAddons);
-            }
-
-            if (fetchedAddons.length === 0) {
-                let currentPage = 1;
-                const pageSize = 100;
-                let totalPages = 1;
-                do {
-                    const { data: batchAddons, totalPages: fetchedTotalPages } = await fetchAddons(
-                        `${currentExpansion}`,
-                        currentPage,
-                        "",
-                        [],
-                        pageSize
-                    );
-                    fetchedAddons = [...fetchedAddons, ...batchAddons];
-                    totalPages = fetchedTotalPages || 1;
-                    currentPage++;
-                } while (currentPage <= totalPages);
-                setAllAddons(fetchedAddons);
-            }
-
-            /*
-             * 5) Create a mapping from MAIN folders to addons ONLY.
-             * This prevents subfolders from incorrectly matching another addon
-             */
-            const folderNameToAddons = {};
-            fetchedAddons.forEach((addon) => {
-                if (addon.custom_fields && addon.custom_fields.folder_list) {
-                    addon.custom_fields.folder_list.forEach(([folderName, isMain]) => {
-                        if (isMain === "1") {
-                            if (!folderNameToAddons[folderName]) {
-                                folderNameToAddons[folderName] = [];
-                            }
-                            folderNameToAddons[folderName].push(addon);
-                        }
-                    });
-                }
-            });
-
-            /*
-             * We'll store discovered addons in matchedAddons,
-             * plus any conflicts in modalQueueTemp for AddonSelectionModal.
-             */
-            const matchedAddons = {};
-            let modalQueueTemp = [];
-
-            // 6) Iterate over each folder in the user's AddOns directory
-            await Promise.all(
-                addonFolders.map(async (folder) => {
-                    const folderPath = window.electron.pathJoin(addonsDir, folder);
-
-                    // Skip if no addon claims this folder as its main folder
-                    const matchingAddons = folderNameToAddons[folder] || [];
-                    if (matchingAddons.length === 0) {
-                        return;
-                    }
-
-                    // Read version from .toc if it exists
-                    const tocFile = window.electron.pathJoin(folderPath, `${folder}.toc`);
-                    let tocVersion = "1.0.0";
-                    if (await window.electron.fileExists(tocFile)) {
-                        const versionFromToc = await window.electron.readVersionFromToc(tocFile);
-                        tocVersion = versionFromToc || tocVersion;
-                    }
-
-                    // Check for .warperia file to see if we can identify which exact addon ID was installed
-                    const warperiaFile = window.electron.pathJoin(folderPath, `${folder}.warperia`);
-                    const warperiaExists = await window.electron.fileExists(warperiaFile);
-
-                    // Create the .warperia file if it doesn't exist
-                    if (!warperiaExists && matchingAddons.length === 1) {
-                        const matchedAddon = matchingAddons[0];
-                        try {
-                            const warperiaContent = `ID: ${matchedAddon.id}\nFolders: ${matchedAddon.custom_fields.folder_list
-                                .map(([f]) => f)
-                                .join(",")
-                                }\nFilename: ${matchedAddon.custom_fields.file.split("/").pop()}`;
-
-                            await window.electron.writeFile(warperiaFile, warperiaContent);
-                        } catch (error) {
-                            console.error(`Failed to create .warperia file for ${folder}:`, error);
-                        }
-                    }
-
-                    let storedFilename = "";
-                    let localGitFingerprint = null;
-                    let localWordPressVersion = "";
-
-                    if (await window.electron.fileExists(warperiaFile)) {
-                        const warperiaContent = await window.electron.readFile(warperiaFile);
-                        const installedAddonId = warperiaContent.match(/ID:\s*(\d+)/)?.[1];
-                        const filenameMatch = warperiaContent.match(/Filename:\s*(.+)/);
-                        const localWpVersionMatch = warperiaContent.match(/^WordPressVersion:\s*(.+)$/m);
-                        let localWordPressVersion = "";
-                        if (localWpVersionMatch) {
-                            localWordPressVersion = localWpVersionMatch[1].trim();
-                        }
-                        const localGitFingerprint = parseGitFingerprint(warperiaContent);
-                        if (filenameMatch) {
-                            storedFilename = filenameMatch[1];
-                        }
-
-                        if (!filenameMatch) {
-                            const matchedAddon = fetchedAddons.find(
-                                (a) => a.id === parseInt(installedAddonId, 10)
-                            );
-                            if (matchedAddon) {
-                                const addonUrl = matchedAddon.custom_fields.file;
-                                const newFilename = addonUrl.split("/").pop();
-                                const newWarperiaContent = `${warperiaContent}\nFilename: ${newFilename}`;
-
-                                await window.electron.overwriteFile(warperiaFile, newWarperiaContent);
-                                storedFilename = newFilename;
-                            }
-                        } else {
-                            storedFilename = filenameMatch[1];
-                        }
-
-                        if (installedAddonId) {
-                            const matchedAddon = fetchedAddons.find(
-                                (a) => a.id === parseInt(installedAddonId, 10)
-                            );
-                            if (matchedAddon) {
-                                // Check if any subfolders are missing (corruption check)
-                                const allAddonFolders =
-                                    matchedAddon.custom_fields.folder_list.map(([f]) => f);
-                                const missingFolders = allAddonFolders.filter(
-                                    (sub) => !addonFolders.includes(sub)
-                                );
-
-                                matchedAddons[folder] = {
-                                    ...matchedAddon,
-                                    corrupted: missingFolders.length > 0,
-                                    missingFolders,
-                                    localVersion: tocVersion,
-                                    storedFilename,
-                                    localGitFingerprint,
-                                    localWordPressVersion
-                                };
-                                return; // Done with this folder
-                            }
-                        }
-                    }
-
-                    // If there's exactly one matching addon, no conflict
-                    if (matchingAddons.length === 1) {
-                        const matchedAddon = matchingAddons[0];
-                        const allAddonFolders =
-                            matchedAddon.custom_fields.folder_list.map(([f]) => f);
-                        const missingFolders = allAddonFolders.filter(
-                            (sub) => !addonFolders.includes(sub)
-                        );
-
-                        matchedAddons[folder] = {
-                            ...matchedAddon,
-                            corrupted: missingFolders.length > 0,
-                            missingFolders,
-                            localVersion: tocVersion,
-                            storedFilename,
-                            localGitFingerprint,
-                            localWordPressVersion
-                        };
-                        return;
-                    }
-
-                    // Otherwise, multiple main folder claims
-                    modalQueueTemp.push(matchingAddons);
-                })
-            );
-
-            // 7) If conflicts were found, open the addon selection modal
-            if (modalQueueTemp.length > 0) {
-                setModalQueue(modalQueueTemp);
-                setCurrentModalData(modalQueueTemp[0]);
-                setShowAddonSelectionModal(true);
-            }
-
-            // 7.5) For each installed addon, if it has a GitHub link & local fingerprint, check if there's a new commit/release
-            // This makes Warperia "see" a new commit on refresh
-            for (const folderName of Object.keys(matchedAddons)) {
-                const installedAddon = matchedAddons[folderName];
-                const isOutdatedOnGitHub = await checkIfGitHubOutdated(installedAddon);
-                if (isOutdatedOnGitHub) {
-                    installedAddon.corrupted = true;
-                }
-                matchedAddons[folderName] = installedAddon;
-            }
-
-            // 8) Update our state for all installed addons we confidently matched
-            setInstalledAddons({ ...matchedAddons });
-
-        } catch (error) {
-            console.error("Error checking installed addons:", error);
-        } finally {
-            setScanningAddons(false);
+    const scanForInstalledAddons = async (gamePath) => {
+        const params = {
+            setScanningAddons,
+            isPathInsideDirectory,
+            showToastMessage,
+            window,
+            allAddons,
+            setAllAddons,
+            parseGitFingerprint,
+            checkIfGitHubOutdated,
+            currentExpansion,
+            setModalQueue,
+            setShowAddonSelectionModal,
+            setCurrentModalData,
+            setInstalledAddons
+        };
+    
+        const matchedAddons = await checkInstalledAddons(gamePath, params);
+        
+        if (matchedAddons) {
+            setInstalledAddons(matchedAddons);
         }
     };
 
@@ -1917,7 +1128,7 @@ const AddonsPage = ({
                     )}" and related folders deleted successfully.`,
                     "success"
                 );
-                await checkInstalledAddons(gameDir);
+                await scanForInstalledAddons(gameDir);
                 await updateAddonUninstallStats(
                     contextMenu.addon.id,
                     contextMenu.addon.post_type
@@ -2046,7 +1257,7 @@ const AddonsPage = ({
             }
 
             showToastMessage(`Successfully deleted addon(s).`, "success");
-            await checkInstalledAddons(gameDir);
+            await scanForInstalledAddons(gameDir);
 
             // If this was triggered during an installation, proceed with the installation
             if (installingAddonId) {
@@ -2169,7 +1380,7 @@ const AddonsPage = ({
                 "success"
             );
             setShowSwitchModal(false);
-            await checkInstalledAddons(gameDir);
+            await scanForInstalledAddons(gameDir);
         } catch (error) {
             console.error("Error switching variations:", error);
             showToastMessage("Failed to switch variations.", "danger");
@@ -2199,7 +1410,7 @@ const AddonsPage = ({
         }
     };
 
-    const handleUpdateAddon = async (addon) => {
+    const handleUpdateAddon = async (addon, skipRefresh = false) => {
         try {
             const installPath = `${gameDir}\\Interface\\AddOns`;
 
@@ -2301,7 +1512,9 @@ const AddonsPage = ({
                 await window.electron.writeFile(warperiaFilePath, newWarperiaContent);
 
                 // 8) Now do the usual reinstall
-                await handleInstallAddon(addon, new Event("click"), true);
+                await handleInstallAddon(addon, new Event("click"), true, false, {
+                    skipRefresh: skipRefresh
+                });    
 
             } else {
                 showToastMessage(
@@ -2346,22 +1559,29 @@ const AddonsPage = ({
                 return;
             }
 
-            // 3) Mark we’re downloading
+            // 3) Mark we're downloading and set the queue
             setDownloading(true);
+            setQueuedAddons(addonsToUpdate.map(addon => addon.id));
 
             // 4) Update each addon that requires an update
-            for (const addon of addonsToUpdate) {
-                await handleUpdateAddon(addon);
+            for (let i = 0; i < addonsToUpdate.length; i++) {
+                const addon = addonsToUpdate[i];
+                setInstallingAddonId(addon.id);
+                await handleUpdateAddon(addon, true);
+                setQueuedAddons(prev => prev.filter(id => id !== addon.id));
             }
 
             // 5) Success message + refresh
+            await refreshAddonsData();
             showToastMessage("All addons updated successfully.", "success");
-            await checkInstalledAddons(gameDir);  // Re-scan installed addons
+            await scanForInstalledAddons(gameDir);  // Re-scan installed addons
         } catch (error) {
             console.error("Error updating all addons:", error);
             showToastMessage("Failed to update all addons.", "danger");
         } finally {
             setDownloading(false);
+            setInstallingAddonId(null);
+            setQueuedAddons([]);
         }
     };
 
@@ -2664,28 +1884,45 @@ const AddonsPage = ({
 
                                     // Build statusContent
                                     let statusContent;
-                                    if (finalNeedsUpdate) {
+                                    if (finalNeedsUpdate && !queuedAddons.includes(installedAddon.id) && 
+                                        !downloading && installingAddonId !== installedAddon.id) {
+                                        // Only show Update button if it truly needs update and is not in queue
                                         statusContent = (
                                             <button
                                                 className="btn btn-primary"
                                                 onClick={(e) => handleInstallAddon(installedAddon, e, true)}
-                                                disabled={downloading && installingAddonId === installedAddon.id}
+                                                disabled={downloading}
                                             >
-                                                {downloading && installingAddonId === installedAddon.id ? (
-                                                    <>
-                                                        <span
-                                                            className="spinner-border spinner-border-sm me-1"
-                                                            role="status"
-                                                            aria-hidden="true"
-                                                        ></span>
-                                                        Updating...
-                                                    </>
-                                                ) : (
-                                                    "Update"
-                                                )}
+                                                Update
                                             </button>
                                         );
+                                    } else if (queuedAddons.includes(installedAddon.id) && installingAddonId !== installedAddon.id) {
+                                        // Show queued status
+                                        statusContent = (
+                                            <Tippy
+                                                content="This addon is queued for update"
+                                                placement="auto"
+                                                className="custom-tooltip"
+                                            >
+                                                <span className="text-muted fw-medium">
+                                                    <i className="bi bi-hourglass-split text-warning me-1"></i> Queued
+                                                </span>
+                                            </Tippy>
+                                        );
+                                    } else if (downloading && installingAddonId === installedAddon.id) {
+                                        // Show updating status
+                                        statusContent = (
+                                            <span className="text-muted fw-medium">
+                                                <span
+                                                    className="spinner-border spinner-border-sm me-1"
+                                                    role="status"
+                                                    aria-hidden="true"
+                                                ></span>
+                                                Updating...
+                                            </span>
+                                        );
                                     } else {
+                                        // Show updated status with green checkmark
                                         statusContent = (
                                             <Tippy
                                                 content="You have the latest version installed"
@@ -2914,7 +2151,7 @@ const AddonsPage = ({
                             <div className="w-100 d-flex flex-wrap align-items-center gap-2">
                                 <Tippy content="Update all addons" placement="auto">
                                     <span>
-                                        <button
+                                    <button
                                             className="btn btn-primary"
                                             onClick={handleUpdateAllAddons}
                                             disabled={
@@ -2940,6 +2177,7 @@ const AddonsPage = ({
                                                     })
                                                     .length === 0
                                                 || downloading
+                                                || queuedAddons.length > 0
                                             }
                                         >
                                             {downloading ? (

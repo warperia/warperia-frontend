@@ -1189,6 +1189,10 @@ a:hover, a:focus {
   margin: 0;
 }
 
+.top-pagination {
+  margin-bottom: 200px;
+}
+
 .context-menu {
   border: 1px solid rgba(99, 99, 99, 0.1);
   max-width: 350px;

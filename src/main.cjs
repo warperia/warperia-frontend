@@ -130,7 +130,7 @@ function createMainWindow() {
             nodeIntegration: true,
             nodeIntegrationInWorker: true,
             contextIsolation: true,
-            devTools: true,
+            devTools: false,
             webSecurity: false
         }
     });

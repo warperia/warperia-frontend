@@ -7,13 +7,39 @@ const Pagination = ({ currentPage, totalPages, onPageChange, onJumpToPage }) => 
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= safeTotalPages) {
       onPageChange(newPage);
+      setTimeout(() => {
+        const rootElement = document.getElementById('root');
+        const targetElement = document.getElementById('browse-addons');
+  
+        if (targetElement && rootElement) {
+          const scrollTop = targetElement.offsetTop;
+          rootElement.scrollTo({
+            top: scrollTop,
+            behavior: 'smooth'
+          });
+        }
+      }, 0);
     }
   };
 
   const handleJumpToPage = (event) => {
-    const pageNumber = parseInt(event.target.value, 10);
+    const inputValue = event.target.value;
+    const pageNumber = parseInt(inputValue, 10);
+  
     if (!isNaN(pageNumber) && pageNumber >= 1 && pageNumber <= safeTotalPages) {
       onPageChange(pageNumber);
+      setTimeout(() => {
+        const rootElement = document.getElementById('root');
+        const targetElement = document.getElementById('browse-addons');
+  
+        if (targetElement && rootElement) {
+          const scrollTop = targetElement.offsetTop;
+          rootElement.scrollTo({
+            top: scrollTop,
+            behavior: 'smooth'
+          });
+        }
+      }, 100);
     }
   };
 
@@ -53,6 +79,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange, onJumpToPage }) => 
             onBlur={handleJumpToPage}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
+                event.preventDefault();
                 handleJumpToPage(event);
               }
             }}
