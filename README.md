@@ -17,8 +17,10 @@
 * Installed addons detection
 * Variation switches
 * One-click updates
-* Game Modifications
-* Sessions Tracking
+* Game modifications
+* Sessions tracking
+* Easily switch realmlists
+* Launch/Restart World of Warcraft
 * Bug Reports
 * Addons searching, sorting and filtering
 * Import/Export functionality
