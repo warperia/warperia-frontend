@@ -7,7 +7,7 @@
   <br>
 </h1>
 
-<h4 align="center">Addon Manager for World of Warcraft private servers built on top of <a href="http://electron.atom.io" target="_blank">Electron</a>.</h4>
+<h4 align="center">Addon Manager for World of Warcraft private servers.</h4>
 
 ![screenshot](https://warperia.com/wp-content/uploads/2024/11/b0320dc3955f58b8372b19c31c81e8e3.jpg)
 
