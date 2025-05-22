@@ -17,7 +17,9 @@
 * Installed addons detection
 * Variation switches
 * One-click updates
-* Import/Export
+* Game Modifications
+* Sessions Tracking
+* Bug Reports
 * Addons searching, sorting and filtering
 * Import/Export functionality
 
