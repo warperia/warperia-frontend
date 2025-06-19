@@ -1,2 +1,2 @@
-export const WEB_URL = ""; // Database
+export const WEB_URL = "";
 export const GITHUB_TOKEN = "";

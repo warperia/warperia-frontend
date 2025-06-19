@@ -1308,6 +1308,23 @@ a:hover, a:focus {
   margin-left: 80px;
 }
 
+.homepage .statistics .card {
+  background-color: #191919;
+  color: #fff;
+  width: 300px;
+  height: auto;
+  text-align: center;
+}
+.homepage .statistics .card .value {
+  font-size: 45px;
+  font-weight: bold;
+}
+.homepage .statistics .card .text {
+  font-weight: 500;
+}
+.homepage .welcome-title {
+  max-width: 600px;
+}
 .homepage .welcome-title .text-gradient {
   background: linear-gradient(90deg, #0f93ff, #abd9ff);
   -webkit-background-clip: text;

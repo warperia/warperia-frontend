@@ -1061,7 +1061,7 @@ a {
           img {
             border-radius: 0.5rem;
             will-change: transform;
-            transition: all .3s;
+            transition: all 0.3s;
           }
         }
 
@@ -1073,8 +1073,8 @@ a {
           }
 
           .meta-author {
-            padding: .2rem .4rem;
-            background-color: rgba(255, 255, 255, .1);
+            padding: 0.2rem 0.4rem;
+            background-color: rgba(255, 255, 255, 0.1);
             font-size: 14px;
             color: #d7d7d7;
           }
@@ -1174,7 +1174,7 @@ a {
 
       .card-img-top {
         transform: scale(1.03);
-        transition: all .3s;
+        transition: all 0.3s;
       }
     }
   }
@@ -1650,7 +1650,29 @@ a {
 
 // Homepage
 .homepage {
+
+  .statistics {
+    .card {
+      background-color: #191919;
+      color: #fff;
+      width: 300px;
+      height: auto;
+      text-align: center;
+
+      .value {
+        font-size: 45px;
+        font-weight: bold;
+      }
+
+      .text {
+        font-weight: 500;
+      }
+    }
+  }
+
   .welcome-title {
+    max-width: 600px;
+
     .text-gradient {
       background: linear-gradient(90deg, #0f93ff, #abd9ff);
       -webkit-background-clip: text;

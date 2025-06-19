@@ -1,6 +1,6 @@
 {
   "name": "warperia",
-  "version": "1.1.7",
+  "version": "1.2.0",
   "description": "World of Warcraft Private Servers Addon Manager Application",
   "main": "src/main.cjs",
   "scripts": {
@@ -13,7 +13,8 @@
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win --x64",
     "dist:mac": "npm run build && electron-builder --mac",
-    "dist:linux": "npm run build && electron-builder --linux"
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:msix": "npm run dist:win && electron-windows-store --input-directory dist/win-unpacked --output-directory dist/msix --package-name Warperia --package-display-name \"Warperia\" --package-version 1.1.9.0 --publisher \"CN=Warperia\" --identity-name \"YourCompanyName.Warperia\""
   },
   "keywords": [],
   "author": "The Warperia Team",
@@ -21,7 +22,7 @@
   "build": {
     "appId": "com.example.warperia",
     "productName": "Warperia",
-    "copyright": "Copyright © 2024 Warperia",
+    "copyright": "Copyright © 2025 Warperia",
     "directories": {
       "output": "dist"
     },
@@ -78,6 +79,7 @@
     "electron-builder": "^25.1.8",
     "electron-is-dev": "^3.0.1",
     "electron-reload": "^2.0.0-alpha.1",
+    "electron-windows-store": "^2.1.0",
     "html-webpack-plugin": "^5.6.0",
     "style-loader": "^4.0.0",
     "wait-on": "^7.2.0",

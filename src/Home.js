@@ -22,6 +22,10 @@ const Home = ({ user, setPage }) => {
   const [userServers, setUserServers] = useState([]);
   const [userServersLoading, setUserServersLoading] = useState(false);
 
+  // State for user statistics
+  const [totalHoursPlayed, setTotalHoursPlayed] = useState(0);
+  const [weeklyHoursPlayed, setWeeklyHoursPlayed] = useState(0);
+
   // Fetch the application version
   useEffect(() => {
     const fetchAppVersion = async () => {
@@ -68,7 +72,7 @@ const Home = ({ user, setPage }) => {
     fetchServers();
   }, []);
 
-  // 3) Fetch the user's server instances
+  // Fetch the user's server instances
   useEffect(() => {
     const fetchUserServers = async () => {
       try {
@@ -78,7 +82,7 @@ const Home = ({ user, setPage }) => {
         // Retrieve the token from Electron
         const tokenResult = await window.electron.retrieveToken();
         if (tokenResult.success && tokenResult.token) {
-          // Fetch the user’s data from the backend
+          // Fetch the user's data from the backend
           const response = await fetch(
             `${WEB_URL}/wp-json/wp/v2/users/${user.id}`,
             {
@@ -100,6 +104,9 @@ const Home = ({ user, setPage }) => {
           }
 
           setUserServers(serversList);
+
+          // Fetch game sessions for each server to calculate total hours
+          await fetchAllGameSessions(serversList);
         }
       } catch (error) {
         console.error("Error fetching user servers:", error);
@@ -111,6 +118,62 @@ const Home = ({ user, setPage }) => {
     fetchUserServers();
   }, [user]);
 
+  // Fetch game sessions for all servers to calculate play time statistics
+  const fetchAllGameSessions = async (serversList) => {
+    try {
+      let totalMinutes = 0;
+      let weeklyMinutes = 0;
+
+      // Get current date for weekly calculation
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      startOfWeek.setHours(0, 0, 0, 0);
+      startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+
+      // Process each server
+      for (const server of serversList) {
+        if (!server?.s_path) continue;
+
+        // Get sessions for this server
+        const sessions = await window.electron.ipcRenderer.invoke(
+          "load-sessions",
+          server.s_path
+        );
+
+        if (sessions && sessions.length > 0) {
+          // Calculate total hours
+          sessions.forEach((session) => {
+            const durationMinutes = session.durationMinutes || 0;
+            totalMinutes += durationMinutes;
+
+            // Check if session is from current week
+            const sessionDate = new Date(session.startTime);
+            if (sessionDate >= startOfWeek) {
+              weeklyMinutes += durationMinutes;
+            }
+          });
+        }
+      }
+
+      // Convert minutes to hours and update state
+      setTotalHoursPlayed(Math.round(totalMinutes / 60));
+      setWeeklyHoursPlayed(Math.round(weeklyMinutes / 60));
+    } catch (error) {
+      console.error("Error calculating play time statistics:", error);
+    }
+  };
+
+  // Format time display (convert hours to days when appropriate)
+  const formatTimeDisplay = (hours) => {
+    if (hours < 24) {
+      return `${hours}h`;
+    } else {
+      const days = Math.floor(hours / 24);
+      const remainingHours = hours % 24;
+      return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+    }
+  };
+
   // Helper to navigate to the single server page
   const goToServerPage = (index) => {
     navigate(`/server/${index}`);
@@ -120,20 +183,48 @@ const Home = ({ user, setPage }) => {
     <div className="d-flex homepage h-100">
       <Sidebar setPage={setPage} />
       <div className="content flex-grow-1">
-
         {/* Welcome */}
         <section className="container border-bottom border-dark pb-5">
           <div className="col-lg-6">
             <h1 className="display-5 text-white fw-bold welcome-title">
-              Your Addons
-              <br />
-              In One <span className="text-gradient">Centralized Hub</span>
+              Hello,{" "}
+              <span className="text-gradient">
+                {user?.display_name || user?.username || "User"}
+              </span>
             </h1>
-            <p className="text-muted">Warperia is a new seamless way of browsing and installing addons for World of Warcraft private servers.</p>
+            <p className="text-muted">
+              Warperia is a new seamless way of browsing and installing addons
+              for World of Warcraft private servers.
+            </p>
             <div className="d-flex align-items-center">
               <span className="badge bg-warning text-black">
                 App version: {appVersion}
               </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="container statistics py-5">
+          <h2 className="text-white fw-medium fs-5 fw-medium mb-1">
+            Quick Glance
+          </h2>
+          <p className="text-muted mb-4">
+            Here is a preview of your gaming statistics
+          </p>
+          <div className="d-flex align-items-center justify-content-between">
+            <div className="card servers">
+              <div className="value">{userServers?.length || 0}</div>
+              <div className="text text-muted">Servers</div>
+            </div>
+            <div className="card servers">
+              <div className="value">{formatTimeDisplay(totalHoursPlayed)}</div>
+              <div className="text text-muted">Total playtime</div>
+            </div>
+            <div className="card servers">
+              <div className="value">
+                {formatTimeDisplay(weeklyHoursPlayed)}
+              </div>
+              <div className="text text-muted">Playtime this week</div>
             </div>
           </div>
         </section>
@@ -203,9 +294,10 @@ const Home = ({ user, setPage }) => {
 
         {/* Public Servers */}
         <section className="container py-5">
-          <h2 className="text-white fw-bold fs-4">Private Servers</h2>
+          <h2 className="text-white fw-bold fs-5">Private Servers</h2>
           <p className="text-muted mb-4 fw-medium">
-            Looking for a new place to play? You might find the following servers interesting
+            Looking for a new place to play? You might find the following
+            servers interesting
           </p>
           {loading ? (
             <div className="text-center">
