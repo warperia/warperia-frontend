@@ -9,7 +9,7 @@
 
 <h4 align="center">Addon Manager for World of Warcraft private servers.</h4>
 
-![screenshot](https://warperia.com/wp-content/uploads/2025/05/e0148f7b3b38a834e14b59cabcbcd00b-min.png)
+![screenshot](https://warperia.com/wp-content/uploads/2026/02/2d6bac8f611a9a2b32f4d08c705a8db1.jpg)
 
 ## Key Features
 
