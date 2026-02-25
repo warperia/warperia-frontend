@@ -13,17 +13,26 @@
 
 ## Key Features
 
-* One-click addon installation
-* Installed addons detection
-* Variation switches
-* One-click updates
-* Game modifications
-* Sessions tracking
-* Easily switch realmlists
-* Launch/Restart World of Warcraft
-* Bug Reports
-* Addons searching, sorting and filtering
-* Import/Export functionality
+* Install Addons
+* Re-install Addons
+* Delete Addons
+* Update Addons
+* Install Addons from GitHub
+* Addon Variations Switcher
+* Export and Import Addons
+* Browse, Search or Filter Thousands of Addons
+* Game Modifications
+* Game Patch Installations (Client Mods)
+* Gameplay Session Tracking
+* Support for Classic Client Addons
+* Support for Vanilla, The Burning Crusade, Wrath of the Lich King, Cataclysm, Mists of Pandaria and Legion Addons
+* Multi-server support with automatic realmlist update
+* Game Launch and Restart Buttons
+* Sidebar Pinning
+* Registration is not required
+* Appearance settings - Themes, Animations, Start-up screens
+* Multiple languages supported - English, Bulgarian, Spanish, Portuguese, German, French, Russian, Chinese, Turkish and Polish
+
 
 ## How To Use
 
